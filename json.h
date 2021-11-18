@@ -127,7 +127,7 @@ public:
 
   /************** 生成ヘルパ関数 ***************/
   /** 整数型（内部では int64_t） */
-  template <typename T, std::enable_if_t<std::is_integral<T>::value, bool> = true>
+  template <typename T, std::enable_if_t<std::is_integral<T>::value && !std::is_same<T, bool>::value, bool> = true>
   static json create(const T& v) { return json(new value_container<int64_t>(static_cast<int64_t>(v))); }
 
   /** 浮動小数点型（内部では double） */
@@ -144,7 +144,7 @@ public:
 
   /************** 設定 ***************/
   /** 整数型（内部では int64_t） */
-  template <typename T, std::enable_if_t<std::is_integral<T>::value, bool> = true>
+  template <typename T, std::enable_if_t<std::is_integral<T>::value && !std::is_same<T, bool>::value, bool> = true>
   void setValue(const T& v) { m_value.reset(new value_container<int64_t>(static_cast<int64_t>(v))); }
 
   /** 浮動小数点型（内部では double） */
@@ -160,12 +160,12 @@ public:
 
 
   /************** 取得 ***************/
-  /** 整数型（doubleからの型変換を許容） */
-  template <typename T, std::enable_if_t<std::is_integral<T>::value, bool> = true>
+  /** 整数型（int_64tからの型変換を許容） */
+  template <typename T, std::enable_if_t<std::is_integral<T>::value && !std::is_same<T, bool>::value, bool> = true>
   T getValue() const {
     return getNumberValue<T, int64_t>();
   }
-  /** 浮動小数点型（int64_tからの型変換を許容） */
+  /** 浮動小数点型（doubleからの型変換を許容） */
   template <typename T, std::enable_if_t<std::is_floating_point<T>::value, bool> = true>
   T getValue() const {
     return getNumberValue<T, double>();
