@@ -122,9 +122,10 @@ private:
     return ivalue ? static_cast<T>(ivalue->value) : static_cast<T>(fvalue->value);
   }
 
-protected:
   /** value_container_base は型消去されており、生成に型制約が存在しないので、外部公開は行わない */
   json(value_container_base* v) : m_value(v) {};
+
+protected:
 
 public:
   json() : m_value(new value_container<undefined_type>({})) {}
