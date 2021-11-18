@@ -183,6 +183,10 @@ public:
   {
     return m_value->value_type();
   }
+  static const json& undefined() {
+    static const json u = json::create(undefined_type{});
+    return u;
+  }
 };
 
 #endif /* !defined(__h_json__) */
