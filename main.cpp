@@ -1,4 +1,5 @@
 #include "json.h"
+#include "json_deserializer.h"
 #include <iostream>
 
 
@@ -30,6 +31,36 @@ int main(void) {
   printValue<std::string>(j);
   printValue<int>(j);
 
+  j.setValue(true);
+  printValue<bool>(j);
+  printValue<int>(j);
+  
+
+  std::stringstream ss(R"(
+    {
+      "user_id": 123, 
+      "name": "Alice",
+      "obj": {
+        "value1": 1,
+        "value2": "2",
+        "value3": [
+          1, true, "ABC"
+        ]
+      }
+    }
+  )");
+  auto de = json_deserializer(ss);
+  auto jj = de.getJson();
+  auto uid = jj.searchValue("user_id");
+  printValue<int>(uid);
+
+  auto v1 = jj.searchValue("obj.value1");
+  printValue<int>(v1);
+
+  auto v3 = jj.searchValue("obj.value3");
+  auto v3a = v3.getValue<json::array_type>();
+  printValue<int>(v3a[0]);
+  printValue<std::string>(v3a[2]);
 
   {
     auto x = json::array_type();
