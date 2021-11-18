@@ -7,9 +7,8 @@
 #include <vector>
 #include <sstream>
 
-class json {
-private:
-
+class json
+{
 public:
   /* js独自の型 */
   struct undefined_type {};
