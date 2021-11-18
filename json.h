@@ -183,6 +183,22 @@ public:
   {
     return m_value->value_type();
   }
+
+  const json& searchValue(const std::string& path) const {
+    if(getValueType() != value_type::object) return json::undefined();
+    const auto pos = path.find(".");
+    auto&& obj = getValue<object_type>();
+    if(pos == std::string::npos){
+      auto it = obj.find(path);
+      return it != obj.end() ? it->second : undefined();
+    }
+    else{
+      const auto left = path.substr(0, pos);
+      const auto right = path.substr(pos + 1);
+      return obj.find(left)->second.searchValue(right);
+    }
+  }
+
   static const json& undefined() {
     static const json u = json::create(undefined_type{});
     return u;
