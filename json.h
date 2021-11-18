@@ -61,7 +61,7 @@ public:
       else if(tid == typeid(object_type    )) return value_type::object;
       else if(tid == typeid(undefined_type )) return value_type::undefined;
       /** MEMO: 型制約は json 側で行われているのでここにくることは無いはず（静的チェックでコンパイルエラーになっている） */
-      throw new json::bad_type();
+      json::bad_type::throw_error();
     }
     virtual std::string value_type_string() const {
       return value_type_string_static();
@@ -77,34 +77,40 @@ public:
       else if(tid == typeid(object_type    )) return "object";
       else if(tid == typeid(undefined_type )) return "undefined";
       /** MEMO: 型制約は json 側で行われているのでここにくることは無いはず（静的チェックでコンパイルエラーになっている） */
-      throw new json::bad_type();
+      json::bad_type::throw_error();
     }
   };
 
   class error : public std::exception {
   private:
     const std::string m_what;
-  public:
+  protected:
     error(const std::string& s) : m_what(s) {}
+  public:
     virtual ~error() = default;
     virtual const char* what() const noexcept { return m_what.c_str(); }
   };
 
-  struct bad_type : public error {
+  class bad_type : public error {
+  private:
     bad_type() : error("bad_type") {}
+  public:
+    [[noreturn]] static void throw_error(){
+      throw new bad_type();
+    }
   };
 
-  struct bad_cast : public error {
+  class bad_cast : public error {
+  private:
     bad_cast(const std::string& s) : error(s) {}
+  public:
+    template<typename T, typename U = T> [[noreturn]] static void throw_error(const std::string& from) {
+      auto&& to = value_container<U>::value_type_string_static();
+      std::stringstream ss;
+      ss << "bad_cast: " << from << " -> " << to;
+      throw new bad_cast(ss.str());
+    }
   };
-
-  template<typename T, typename U = T> void throwBadCast() const {
-    auto&& from = m_value->value_type_string();
-    auto&& to = value_container<U>::value_type_string_static();
-    std::stringstream ss;
-    ss << "bad_cast: " << from << " -> " << to;
-    throw new bad_cast(ss.str());
-  }
 
 private:
   std::unique_ptr<value_container_base> m_value;
@@ -112,7 +118,7 @@ private:
   template <typename T, typename U> T getNumberValue() const {
     auto ivalue = dynamic_cast<value_container<int64_t>*>(m_value.get());
     auto fvalue = dynamic_cast<value_container<double>*>(m_value.get());
-    if(ivalue == nullptr && fvalue == nullptr) throwBadCast<T, U>();
+    if(ivalue == nullptr && fvalue == nullptr) bad_cast::throw_error<T, U>(m_value->value_type_string());
     return ivalue ? static_cast<T>(ivalue->value) : static_cast<T>(fvalue->value);
   }
 
@@ -174,7 +180,7 @@ public:
   template <typename T, std::enable_if_t<is_available_type<T>::value, bool> = true>
   const T& getValue() const {
     auto avalue = dynamic_cast<value_container<T>*>(m_value.get());
-    if(avalue == nullptr) throwBadCast<T>();
+    if(avalue == nullptr) bad_cast::throw_error<T>(m_value->value_type_string());
     return avalue->value;
   }
 
