@@ -19,6 +19,7 @@ public:
   enum class value_type { integral, floating_point, string, boolean, null, array, object, undefined };
 
   /** value_container で保持できる型を制限するための判定クラス（setValue(), getValue() で使用する） */
+  /* 整数型・浮動小数点型は別途 is_integral<> と is_floating_point<> で制限を行う（static_castで型変換を行いたいため） */
   template <typename T> struct is_available_type;
   template <> struct is_available_type<std::string    > { static constexpr bool value = true; };
   template <> struct is_available_type<bool           > { static constexpr bool value = true; };
@@ -232,6 +233,7 @@ public:
     }
   }
 
+  /** undefined 型を内包する json オブジェクト */
   static const json& undefined() {
     static const json u = json::create(undefined_type{});
     return u;
