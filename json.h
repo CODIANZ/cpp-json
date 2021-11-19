@@ -212,15 +212,30 @@ public:
     return avalue->value;
   }
 
-  /* 値の型を取得 */
-  const value_type getValueType() const
-  {
-    return m_value->value_type();
+  /** 自身を複製する（deep copy） */
+  json clone() const {
+    return json(m_value->clone());
   }
 
-  const json& searchValue(const std::string& path) const {
+  /** 保持している値を開放し、開放された値を返却する。 json は undefined となる */
+  template <typename T, std::enable_if_t<is_available_type<T>::value, bool> = true>
+  void release(std::unique_ptr<T>& value) {
+    value.reset(m_value.release());
+    m_value.reset(new value_container<undefined_type>({}));
+  }
+
+  /** 値の型を取得 */
+  const value_type getValueType() const { return m_value->value_type(); }
+
+  /* undefined, null 確認用関数 */
+  bool isUndefined() const  { return (m_value->value_type() == value_type::undefined); }
+  bool isNull() const       { return (m_value->value_type() == value_type::null); }
+  bool isNullOrUndefined() const { return isUndefined() || isNull(); }
+
+  /** object型に対する値の検索 */
+  const json& searchValue(const std::string& path, const char separator = '.') const {
     if(getValueType() != value_type::object) return json::undefined();
-    const auto pos = path.find(".");
+    const auto pos = path.find(separator);
     auto&& obj = getValue<object_type>();
     if(pos == std::string::npos){
       auto it = obj.find(path);
