@@ -19,7 +19,6 @@ public:
   enum class value_type { integral, floating_point, string, boolean, null, array, object, undefined };
 
   /** value_container で保持できる型を制限するための判定クラス（setValue(), getValue() で使用する） */
-  /* 整数型・浮動小数点型は別途 is_integral<> と is_floating_point<> で制限を行う（static_castで型変換を行いたいため） */
   template <typename T> struct is_available_type;
   template <> struct is_available_type<std::string    > { static constexpr bool value = true; };
   template <> struct is_available_type<bool           > { static constexpr bool value = true; };
@@ -27,14 +26,21 @@ public:
   template <> struct is_available_type<array_type     > { static constexpr bool value = true; };
   template <> struct is_available_type<object_type    > { static constexpr bool value = true; };
   template <> struct is_available_type<undefined_type > { static constexpr bool value = true; };
+  template <> struct is_available_type<int64_t        > { static constexpr bool value = true; };
+  template <> struct is_available_type<double         > { static constexpr bool value = true; };
   template <typename T> struct is_available_type        { static constexpr bool value = false;};
 
-  /** number型として有効な型を判定 */ 
-  template <typename T> struct is_number_type {
-    static constexpr bool value = (std::is_integral<T>::value || std::is_floating_point<T>::value) && (!std::is_same<T, bool>::value);
+  /** int64_t に変換可能か判定する（int64_tとboolは除外） */
+  template <typename T> struct is_integer_compatible {
+    static constexpr bool value = std::is_integral<T>::value && (!std::is_same<T, bool>::value) && (!std::is_same<T, int64_t>::value);
   };
 
-  /** value_container の基本クラス */
+  /** double に変換可能か判定する（doubleは除外） */
+  template <typename T> struct is_floating_point_compatible {
+    static constexpr bool value = std::is_floating_point<T>::value && (!std::is_same<T, double>::value);
+  };
+
+  /** value_container の基底クラス */
   class value_container_base {
   protected:
     value_container_base() = default;
@@ -50,7 +56,7 @@ public:
     class value_container : public value_container_base
   {
   public:
-    const T value;
+    T value;
     value_container(const T& v) : value(v) {};
     virtual ~value_container() = default;
     virtual value_container_base* clone() const {
@@ -87,6 +93,7 @@ public:
     }
   };
 
+  /** 例外オブジェクト */
   class error : public std::exception {
   private:
     const std::string m_what;
@@ -121,6 +128,7 @@ public:
 private:
   std::unique_ptr<value_container_base> m_value;
 
+  /** 整数型、浮動小数点の相互型変換を考慮した値取得 */
   template <typename T, typename U> T getNumberValue() const {
     auto ivalue = dynamic_cast<value_container<int64_t>*>(m_value.get());
     auto fvalue = dynamic_cast<value_container<double>*>(m_value.get());
@@ -136,82 +144,145 @@ protected:
 public:
   json() : m_value(new value_container<undefined_type>({})) {}
   json(const json& s) : m_value(s.m_value->clone()) {}
+
+  /** 許容される値で構築（型の妥当性は setValue に委譲） */
+  template <typename T> json(const T& v) {
+    setValue(v);
+  }
+
+  /** object型の initialize_list で構築*/
+  json(const std::initializer_list<object_type::value_type>& list){
+    setValue(list);
+  }
+
+  /**
+   * json の initializer_list で構築
+   * TODO: これが実現できると `json x = {1, true, "123"};` 的な表現が可能になる。
+   * しかし、{"aaa", 1} という表現が連想配列なのか、単に配列なのかが不明瞭でコンパイルエラーになる。
+   * したがって、現在は保留とする。
+   **/
+  // json(const std::initializer_list<json>& list) {
+  //   setValue(list);
+  // }
+
+  /* avalable_type と変換可能な値の initializer_list で構築（型の妥当性は setValue に委譲） */
+  template <typename T> json(const std::initializer_list<T>& list) {
+    setValue(list);
+  }
+
   ~json() = default;
 
-  /************** 生成ヘルパ関数 ***************/
+  /************** 設定（関数） ***************/
   /** 整数型（内部では int64_t） */
-  template <typename T, std::enable_if_t<std::is_integral<T>::value && !std::is_same<T, bool>::value, bool> = true>
-  static json create(const T& v) { return json(new value_container<int64_t>(static_cast<int64_t>(v))); }
-
-  /** 浮動小数点型（内部では double） */
-  template <typename T, std::enable_if_t<std::is_floating_point<T>::value, bool> = true>
-  static json create(const T& v) { return json(new value_container<double>(static_cast<double>(v))); }
-
-  /** その他の許容可能な型 */
-  template <typename T, std::enable_if_t<is_available_type<T>::value, bool> = true>
-  static json create(const T& v) { return json(new value_container<T>(v)); }
-
-  /** C文字列を受け入れる（内部では std::string） */
-  static json create(const char* v){ return json(new value_container<std::string>(v)); }
-
-  /************** initializer_list による生成ヘルパ関数 **************/
-  /** object型 */
-  static json create(const std::initializer_list<object_type::value_type>& list) {  
-    return json(new value_container<object_type>(list));
-  }
-
-  /* json の配列 */
-  static json create(const std::initializer_list<json>& list) {  
-    return json(new value_container<array_type>(list));
-  }
-
-  /* avalable_type と number_type の配列（配列内の型が異なる場合は jsonの配列として初期化する） */
-  template <typename T, std::enable_if_t<is_available_type<T>::value || is_number_type<T>::value, bool> = true>
-  static json create(const std::initializer_list<T>& list) {  
-    auto arr = json::array_type();
-    auto it = list.begin();
-    for(auto it = list.begin(); it != list.end(); it++){
-      arr.push_back(json::create(*it));
-    }
-    return json::create(arr);
-  }
-
-  /************** 設定 ***************/
-  /** 整数型（内部では int64_t） */
-  template <typename T, std::enable_if_t<std::is_integral<T>::value && !std::is_same<T, bool>::value, bool> = true>
+  template <typename T, std::enable_if_t<is_integer_compatible<T>::value, bool> = true>
   void setValue(const T& v) { m_value.reset(new value_container<int64_t>(static_cast<int64_t>(v))); }
 
   /** 浮動小数点型（内部では double） */
-  template <typename T, std::enable_if_t<std::is_floating_point<T>::value, bool> = true>
+  template <typename T, std::enable_if_t<is_floating_point_compatible<T>::value, bool> = true>
   void setValue(const T& v) { m_value.reset(new value_container<double>(static_cast<double>(v))); }
 
   /** その他の許容可能な型 */
   template <typename T, std::enable_if_t<is_available_type<T>::value, bool> = true>
   void setValue(const T& v) { m_value.reset(new value_container<T>(v)); }
 
-  /** 文字列（std::stringに暗黙の型変換可能なものを許容するため） */
-  void setValue(const std::string& v){ m_value.reset(new value_container<std::string>(v)); }
+  /** C文字列を受け入れる（内部では std::string） */
+  void setValue(const char* v){ m_value.reset(new value_container<std::string>(v)); }
 
+  /** object型の initialize_list */
+  void setValue(const std::initializer_list<object_type::value_type>& list){
+    m_value.reset(new value_container<object_type>(list));
+  }
+
+  /** json の initializer_list */
+  // void setValue(const std::initializer_list<json>& list) {  
+  //   m_value.reset(new value_container<array_type>(list));
+  // }
+
+  /* avalable_type と変換可能な値の initializer_list */
+  template <typename T, std::enable_if_t<
+    is_available_type<T>::value ||
+    is_integer_compatible<T>::value ||
+    is_floating_point_compatible<T>::value ||
+    std::is_same<T, const char*>::value
+    , bool> = true>
+  void setValue(const std::initializer_list<T>& list) {  
+    auto arr = std::unique_ptr<value_container<array_type>>(new value_container<array_type>({}));
+    auto it = list.begin();
+    for(auto it = list.begin(); it != list.end(); it++){
+      arr->value.push_back(json(*it));
+    }
+    m_value.reset(arr.release());
+  }
+
+
+  /************** 設定（代入） ***************/
+  /** 整数型（内部では int64_t） */
+  template <typename T, std::enable_if_t<is_integer_compatible<T>::value, bool> = true>
+  json& operator =(const T& v) { setValue(v); return *this; }
+
+  /** 浮動小数点型（内部では double） */
+  template <typename T, std::enable_if_t<is_floating_point_compatible<T>::value, bool> = true>
+  json& operator =(const T& v) { setValue(v); return *this; }
+
+  /** その他の許容可能な型 */
+  template <typename T, std::enable_if_t<is_available_type<T>::value, bool> = true>
+  json& operator =(const T& v) { setValue(v); return *this; }
+
+  /** C文字列を受け入れる（内部では std::string） */
+  json& operator =(const char* v) { setValue(v); return *this; }
+
+  /** object型の initialize_list */
+  json& operator =(const std::initializer_list<object_type::value_type>& list){
+    setValue(list);
+    return *this;
+  }
+
+  /** json の initializer_list */
+  // json& operator =(const std::initializer_list<json>& list) {  
+  //   setValue(list);
+  //   return *this;
+  // }
+
+  /* avalable_type と変換可能な数値の initializer_list */
+  template <typename T, std::enable_if_t<
+    is_available_type<T>::value ||
+    is_integer_compatible<T>::value ||
+    is_floating_point_compatible<T>::value ||
+    std::is_same<T, const char*>::value
+    , bool> = true>
+  json& operator =(const std::initializer_list<T>& list) {  
+    setValue(list);
+    return *this;
+  }
 
   /************** 取得 ***************/
-  /** 整数型（int_64tからの型変換を許容） */
-  template <typename T, std::enable_if_t<std::is_integral<T>::value && !std::is_same<T, bool>::value, bool> = true>
-  T getValue() const {
+  /** 整数型（int_64tからの型変換を許容するため参照ではなく値のコピーを返却する点に注意） */
+  template <typename T, std::enable_if_t<is_integer_compatible<T>::value, bool> = true>
+  const T getValue() const {
     return getNumberValue<T, int64_t>();
   }
-  /** 浮動小数点型（doubleからの型変換を許容） */
-  template <typename T, std::enable_if_t<std::is_floating_point<T>::value, bool> = true>
-  T getValue() const {
+  /** 浮動小数点型（doubleからの型変換を許容するため参照ではなく値のコピーを返却する点に注意） */
+  template <typename T, std::enable_if_t<is_floating_point_compatible<T>::value, bool> = true>
+  const T getValue() const {
     return getNumberValue<T, double>();
   }
-  /** その他の許容可能な型 */
+  /** その他の許容可能な型（const） */
   template <typename T, std::enable_if_t<is_available_type<T>::value, bool> = true>
   const T& getValue() const {
     auto avalue = dynamic_cast<value_container<T>*>(m_value.get());
     if(avalue == nullptr) bad_cast::throw_error<T>(m_value->value_type_string());
     return avalue->value;
   }
+  /** その他の許容可能な型（非const） */
+  template <typename T, std::enable_if_t<is_available_type<T>::value, bool> = true>
+  T& getValue() {
+    auto avalue = dynamic_cast<value_container<T>*>(m_value.get());
+    if(avalue == nullptr) bad_cast::throw_error<T>(m_value->value_type_string());
+    return avalue->value;
+  }
 
+
+  /************** メモリ管理 ***************/
   /** 自身を複製する（deep copy） */
   json clone() const {
     return json(m_value->clone());
@@ -224,6 +295,8 @@ public:
     m_value.reset(new value_container<undefined_type>({}));
   }
 
+
+  /************** 状態・属性 ***************/
   /** 値の型を取得 */
   const value_type getValueType() const { return m_value->value_type(); }
 
@@ -232,26 +305,38 @@ public:
   bool isNull() const       { return (m_value->value_type() == value_type::null); }
   bool isNullOrUndefined() const { return isUndefined() || isNull(); }
 
-  /** object型に対する値の検索 */
-  const json& searchValue(const std::string& path, const char separator = '.') const {
-    if(getValueType() != value_type::object) return json::undefined();
+
+  /************** プロパティ検索 ***************/
+  /** object型に対する値の検索（const） */
+  const json* find(const std::string& path, const char separator = '.') const {
+    if(getValueType() != value_type::object) return nullptr;
     const auto pos = path.find(separator);
     auto&& obj = getValue<object_type>();
     if(pos == std::string::npos){
       auto it = obj.find(path);
-      return it != obj.end() ? it->second : undefined();
+      return it != obj.end() ? &it->second : nullptr;
     }
     else{
       const auto left = path.substr(0, pos);
       const auto right = path.substr(pos + 1);
-      return obj.find(left)->second.searchValue(right);
+      return obj.find(left)->second.find(right, separator);
     }
   }
 
-  /** undefined 型を内包する json オブジェクト */
-  static const json& undefined() {
-    static const json u = json::create(undefined_type{});
-    return u;
+  /** object型に対する値の検索（非const） */
+  json* find(const std::string& path, const char separator = '.') {
+    if(getValueType() != value_type::object) return nullptr;
+    const auto pos = path.find(separator);
+    auto&& obj = getValue<object_type>();
+    if(pos == std::string::npos){
+      auto it = obj.find(path);
+      return it != obj.end() ? &it->second : nullptr;
+    }
+    else{
+      const auto left = path.substr(0, pos);
+      const auto right = path.substr(pos + 1);
+      return obj.find(left)->second.find(right, separator);
+    }
   }
 };
 

@@ -8,11 +8,21 @@ template <typename T> void printValue(const json& j) {
     std::cout << j.getValue<T>() << std::endl;
   }
   catch(std::exception* e){
-    std::cout << e->what() << std::endl;
+    std::cerr << e->what() << std::endl;
   }
 }
 
-int main(void) {
+template <typename T> void printValue(const json* j) {
+  if(j == nullptr) {
+    std::cerr << "json* == nullptr" << std::endl;
+  }
+  else{
+    printValue<T>(*j);
+  }
+}
+
+
+void test_1() {
   json j;
   j.setValue("aaa");
 
@@ -34,8 +44,9 @@ int main(void) {
   j.setValue(true);
   printValue<bool>(j);
   printValue<int>(j);
-  
+}
 
+void test_2() {
   std::stringstream ss(R"(
     {
       "user_id": 123, 
@@ -51,21 +62,60 @@ int main(void) {
   )");
   auto de = json_deserializer(ss);
   auto jj = de.getJson();
-  auto uid = jj.searchValue("user_id");
-  printValue<int>(uid);
+  printValue<int>(jj.find("user_id"));
 
-  auto v1 = jj.searchValue("obj.value1");
-  printValue<int>(v1);
+  printValue<int>(jj.find("obj.value1"));
 
-  auto v3 = jj.searchValue("obj.value3");
-  auto v3a = v3.getValue<json::array_type>();
-  printValue<int>(v3a[0]);
-  printValue<std::string>(v3a[2]);
+  auto value3 = jj.find("obj.value3");
+  auto value3_arr = value3->getValue<json::array_type>();
+  printValue<int>(value3_arr[0]);
+  printValue<std::string>(value3_arr[2]);  
+}
+
+void test_3() {
+  {
+    json x({1, 2, 3});
+    printValue<int>(x.getValue<json::array_type>()[2]);
+  }
+  {
+    json x({ "a", "b", "c"});
+    printValue<std::string>(x.getValue<json::array_type>()[1]);
+  }
 
   {
-    auto x = json::array_type();
-    x.push_back(json::create(12));
-    auto y = x;
+    json x({
+      {"abc", 1},
+      {"aaa", "aaa"}
+    });
+    printValue<int>(x.find("abc"));
+    printValue<std::string>(x.find("aaa"));
   }
+  {
+    json x = {
+      {"aaa", 1},
+      {"bbb", 1.5},
+      {"ccc", {"abc", "def"}},
+      {"ddd", {1, 2}},
+      {"eee", {
+        {"1", 1.0},
+        {"2", "2.0"}
+      }}
+    };
+    printValue<std::string>(x.find("ccc")->getValue<json::array_type>()[1]);
+    printValue<int>(x.find("ddd")->getValue<json::array_type>()[1]);
+  }
+}
+
+int main(void) {
+
+  std::cout << "********** test_1() **********" << std::endl;
+  test_1();
+
+  std::cout << "********** test_2() **********" << std::endl;
+  test_2();
+
+  std::cout << "********** test_3() **********" << std::endl;
+  test_3();
+
   return 0;
 }
