@@ -26,6 +26,12 @@ public:
   template <> struct is_available_type<array_type     > { static constexpr bool value = true; };
   template <> struct is_available_type<object_type    > { static constexpr bool value = true; };
   template <> struct is_available_type<undefined_type > { static constexpr bool value = true; };
+  template <typename T> struct is_available_type        { static constexpr bool value = false;};
+
+  /** number型として有効な型を判定 */ 
+  template <typename T> struct is_number_type {
+    static constexpr bool value = (std::is_integral<T>::value || std::is_floating_point<T>::value) && (!std::is_same<T, bool>::value);
+  };
 
   /** value_container の基本クラス */
   class value_container_base {
@@ -144,9 +150,30 @@ public:
   template <typename T, std::enable_if_t<is_available_type<T>::value, bool> = true>
   static json create(const T& v) { return json(new value_container<T>(v)); }
 
-  /** 文字列（std::stringに暗黙の型変換可能なものを許容するため） */
-  static json create(const std::string& v){ return json(new value_container<std::string>(v)); }
+  /** C文字列を受け入れる（内部では std::string） */
+  static json create(const char* v){ return json(new value_container<std::string>(v)); }
 
+  /************** initializer_list による生成ヘルパ関数 **************/
+  /** object型 */
+  static json create(const std::initializer_list<object_type::value_type>& list) {  
+    return json(new value_container<object_type>(list));
+  }
+
+  /* json の配列 */
+  static json create(const std::initializer_list<json>& list) {  
+    return json(new value_container<array_type>(list));
+  }
+
+  /* avalable_type と number_type の配列（配列内の型が異なる場合は jsonの配列として初期化する） */
+  template <typename T, std::enable_if_t<is_available_type<T>::value || is_number_type<T>::value, bool> = true>
+  static json create(const std::initializer_list<T>& list) {  
+    auto arr = json::array_type();
+    auto it = list.begin();
+    for(auto it = list.begin(); it != list.end(); it++){
+      arr.push_back(json::create(*it));
+    }
+    return json::create(arr);
+  }
 
   /************** 設定 ***************/
   /** 整数型（内部では int64_t） */
