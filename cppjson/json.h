@@ -1,5 +1,5 @@
-#if !defined(__h_json__)
-#define __h_json__
+#if !defined(__cppjson_h_json__)
+#define __cppjson_h_json__
 
 #include <string>
 #include <unordered_map>
@@ -7,6 +7,9 @@
 #include <vector>
 #include <sstream>
 
+#include "errors.h"
+
+namespace cppjson {
 class json
 {
 public:
@@ -18,7 +21,8 @@ public:
   /** value_container で保持している型（integral と floating_point はjsではNumber型だが、この世界では別の型として区別する） */
   enum class value_type { integral, floating_point, string, boolean, null, array, object, undefined };
 
-  /** value_container で保持できる型を制限するための判定クラス（setValue(), getValue() で使用する） */
+private:
+  /** value_container で保持できる型を制限するための判定クラス（set(), get() で使用する） */
   template <typename T> struct is_available_type;
   template <> struct is_available_type<std::string    > { static constexpr bool value = true; };
   template <> struct is_available_type<bool           > { static constexpr bool value = true; };
@@ -73,7 +77,7 @@ public:
       else if(tid == typeid(object_type    )) return value_type::object;
       else if(tid == typeid(undefined_type )) return value_type::undefined;
       /** MEMO: 型制約は json 側で行われているのでここにくることは無いはず（静的チェックでコンパイルエラーになっている） */
-      json::bad_type::throw_error();
+      bad_type::throw_error();
     }
     virtual std::string value_type_string() const {
       return value_type_string_static();
@@ -88,65 +92,44 @@ public:
       else if(tid == typeid(array_type     )) return "array";
       else if(tid == typeid(object_type    )) return "object";
       else if(tid == typeid(undefined_type )) return "undefined";
-      /** MEMO: 型制約は json 側で行われているのでここにくることは無いはず（静的チェックでコンパイルエラーになっている） */
-      json::bad_type::throw_error();
+      else {
+        std::stringstream ss;
+        ss << "invalid type(" << tid.name() << ")";
+        return ss.str();
+      }
     }
   };
 
-  /** 例外オブジェクト */
-  class error : public std::exception {
-  private:
-    const std::string m_what;
-  protected:
-    error(const std::string& s) : m_what(s) {}
-  public:
-    virtual ~error() = default;
-    virtual const char* what() const noexcept { return m_what.c_str(); }
-  };
-
-  class bad_type : public error {
-  private:
-    bad_type() : error("bad_type") {}
-  public:
-    [[noreturn]] static void throw_error(){
-      throw new bad_type();
-    }
-  };
-
-  class bad_cast : public error {
-  private:
-    bad_cast(const std::string& s) : error(s) {}
-  public:
-    template<typename T, typename U = T> [[noreturn]] static void throw_error(const std::string& from) {
-      auto&& to = value_container<U>::value_type_string_static();
-      std::stringstream ss;
-      ss << "bad_cast: " << from << " -> " << to;
-      throw new bad_cast(ss.str());
-    }
-  };
-
-private:
   std::unique_ptr<value_container_base> m_value;
 
   /** 整数型、浮動小数点の相互型変換を考慮した値取得 */
-  template <typename T, typename U> T getNumberValue() const {
+  template <typename T> T getNumberValue() const {
     auto ivalue = dynamic_cast<value_container<int64_t>*>(m_value.get());
     auto fvalue = dynamic_cast<value_container<double>*>(m_value.get());
-    if(ivalue == nullptr && fvalue == nullptr) bad_cast::throw_error<T, U>(m_value->value_type_string());
+    if(ivalue == nullptr && fvalue == nullptr) throw_bad_cast<T>(m_value->value_type_string());
     return ivalue ? static_cast<T>(ivalue->value) : static_cast<T>(fvalue->value);
   }
 
   /** json の配列による設定の継続処理 */
   template <typename T, typename ...TARGS> void pushValues(array_type& arr, const T& v, TARGS ...vargs){
     arr.push_back(v);
-    pushValues(arr, vargs...);
+    pushValues(arr, std::forward<TARGS>(vargs)...);
   }
 
   /** json の配列による設定のゴール地点 */
   void pushValues(array_type& arr) {};
 
+  /** 型変換不能エラー */
+  template<typename T> [[noreturn]] static void throw_bad_cast(const std::string& from) {
+    auto&& to = value_container<T>::value_type_string_static();
+    std::stringstream ss;
+    ss << "bad_cast: " << from << " -> " << to;
+    throw new bad_cast(ss.str());
+  }
+
 
 protected:
+
 
 public:
   json() : m_value(new value_container<undefined_type>({})) {}
@@ -176,45 +159,46 @@ public:
   /* json の配列は許容可能な型が混在しているため、 initializer_list は使用せず可変引数テンプレートで逐次処理を行う */
   template <typename ...TARGS> json(TARGS ...vargs) {
     m_value.reset(new value_container<array_type>({}));
-    auto& arr = getValue<array_type>();
-    pushValues(arr, vargs...);
+    auto& arr = get<array_type>();
+    pushValues(arr, std::forward<TARGS>(vargs)...);
   }
 
   ~json() = default;
 
+
   /************** 設定（関数） ***************/
-  void setValue(const json& j) { m_value.reset(j.m_value->clone()); }
-  void setValue(json&& j) { m_value.reset(j.m_value.release()); }
+  void set(const json& j) { m_value.reset(j.m_value->clone()); }
+  void set(json&& j) { m_value.reset(j.m_value.release()); }
 
 
   /************** 設定（代入） ***************/
-  json& operator =(const json& j) { setValue(j); return *this; }
-  json& operator =(json&& j) { setValue(j); return *this; }
+  json& operator =(const json& j) { set(j); return *this; }
+  json& operator =(json&& j) { set(j); return *this; }
 
 
   /************** 取得 ***************/
   /** 整数型（int_64tからの型変換を許容するため参照ではなく値のコピーを返却する点に注意） */
   template <typename T, std::enable_if_t<is_integer_compatible<T>::value, bool> = true>
-  const T getValue() const {
-    return getNumberValue<T, int64_t>();
+  const T get() const {
+    return getNumberValue<T>();
   }
   /** 浮動小数点型（doubleからの型変換を許容するため参照ではなく値のコピーを返却する点に注意） */
   template <typename T, std::enable_if_t<is_floating_point_compatible<T>::value, bool> = true>
-  const T getValue() const {
-    return getNumberValue<T, double>();
+  const T get() const {
+    return getNumberValue<T>();
   }
   /** その他の許容可能な型（const） */
   template <typename T, std::enable_if_t<is_available_type<T>::value, bool> = true>
-  const T& getValue() const {
+  const T& get() const {
     auto avalue = dynamic_cast<value_container<T>*>(m_value.get());
-    if(avalue == nullptr) bad_cast::throw_error<T>(m_value->value_type_string());
+    if(avalue == nullptr) throw_bad_cast<T>(m_value->value_type_string());
     return avalue->value;
   }
   /** その他の許容可能な型（非const） */
   template <typename T, std::enable_if_t<is_available_type<T>::value, bool> = true>
-  T& getValue() {
+  T& get() {
     auto avalue = dynamic_cast<value_container<T>*>(m_value.get());
-    if(avalue == nullptr) bad_cast::throw_error<T>(m_value->value_type_string());
+    if(avalue == nullptr) throw_bad_cast<T>(m_value->value_type_string());
     return avalue->value;
   }
 
@@ -235,20 +219,21 @@ public:
 
   /************** 状態・属性 ***************/
   /** 値の型を取得 */
-  const value_type getValueType() const { return m_value->value_type(); }
+  const value_type value_type() const { return m_value->value_type(); }
 
   /* undefined, null 確認用関数 */
-  bool isUndefined() const  { return (m_value->value_type() == value_type::undefined); }
-  bool isNull() const       { return (m_value->value_type() == value_type::null); }
-  bool isNullOrUndefined() const { return isUndefined() || isNull(); }
+  bool is_undefined() const         { return value_type() == value_type::undefined; }
+  bool is_null() const              { return value_type() == value_type::null; }
+  bool is_null_or_undefined() const { return is_undefined() || is_null(); }
 
+  operator bool() const { return is_null_or_undefined(); }
 
   /************** プロパティ検索 ***************/
   /** object型に対する値の検索（const） */
   const json* find(const std::string& path, const char separator = '.') const {
-    if(getValueType() != value_type::object) return nullptr;
+    if(value_type() != value_type::object) return nullptr;
     const auto pos = path.find(separator);
-    auto&& obj = getValue<object_type>();
+    auto&& obj = get<object_type>();
     if(pos == std::string::npos){
       auto it = obj.find(path);
       return it != obj.end() ? &it->second : nullptr;
@@ -262,9 +247,9 @@ public:
 
   /** object型に対する値の検索（非const） */
   json* find(const std::string& path, const char separator = '.') {
-    if(getValueType() != value_type::object) return nullptr;
+    if(value_type() != value_type::object) return nullptr;
     const auto pos = path.find(separator);
-    auto&& obj = getValue<object_type>();
+    auto&& obj = get<object_type>();
     if(pos == std::string::npos){
       auto it = obj.find(path);
       return it != obj.end() ? &it->second : nullptr;
@@ -276,5 +261,6 @@ public:
     }
   }
 };
+} /** namespace cppjson */
 
-#endif /* !defined(__h_json__) */
+#endif /* !defined(__cppjson_h_json__) */

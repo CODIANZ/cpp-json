@@ -1,11 +1,11 @@
-#include "json.h"
-#include "json_deserializer.h"
+#include "cppjson/cppjson.h"
 #include <iostream>
 
+using namespace cppjson;
 
 template <typename T> void printValue(const json& j) {
   try{
-    std::cout << j.getValue<T>() << std::endl;
+    std::cout << j.get<T>() << std::endl;
   }
   catch(std::exception* e){
     std::cerr << e->what() << std::endl;
@@ -22,7 +22,7 @@ template <typename T> void printValue(const json* j) {
 }
 
 /** constructor */
-void test_0() {
+void test_001() {
   json a;
   json b(std::string("abc"));
   json c(true);
@@ -37,7 +37,7 @@ void test_0() {
 }
 
 /** operator = */
-void test_01() {
+void test_002() {
   json a;
   a = std::string("abc");
   a = true;
@@ -51,90 +51,62 @@ void test_01() {
   a = "c-string";
 }
 
-/** setValue */
-void test_02() {
+/** setter */
+void test_003() {
   json a;
-  a.setValue(std::string("abc"));
-  a.setValue(true);
-  a.setValue(nullptr);
-  a.setValue({1, "abc", true});
-  a.setValue({{"key1", "value1"}, {"key2", 1.23}});
-  a.setValue(123456789ll);
-  a.setValue(1.2345678);
-  a.setValue(456);
-  a.setValue(1.2345678f);
-  a.setValue("c-string");
+  a.set(std::string("abc"));
+  a.set(true);
+  a.set(nullptr);
+  a.set({1, "abc", true});
+  a.set({{"key1", "value1"}, {"key2", 1.23}});
+  a.set(123456789ll);
+  a.set(1.2345678);
+  a.set(456);
+  a.set(1.2345678f);
+  a.set("c-string");
 }
 
-/** json to json */
-void test_03() {
+/** json = json */
+void test_004() {
   json a, b;
   a = "abc";
   b = a;
   a = std::move(b);
 }
 
-
-
-
-void test_1() {
+/** get */
+void test_005() {
   json j;
-  j.setValue("aaa");
+  j.set("aaa");
 
-  j.setValue(12LL);
+  j.set(12LL);
   printValue<int>(j);
   printValue<double>(j);
   
-  j.setValue(12);
-  j.setValue(12.5);
-  j.setValue(12.5f);
+  j.set(12);
+  j.set(12.5);
+  j.set(12.5f);
   printValue<int>(j);
   printValue<double>(j);
   printValue<std::string>(j);
 
-  j.setValue("abc");
+  j.set("abc");
   printValue<std::string>(j);
-  printValue<int>(j);
+  printValue<int>(j); /* error */
 
-  j.setValue(true);
+  j.set(true);
   printValue<bool>(j);
-  printValue<int>(j);
+  printValue<int>(j); /* error */
 }
 
-void test_2() {
-  std::stringstream ss(R"(
-    {
-      "user_id": 123, 
-      "name": "Alice",
-      "obj": {
-        "value1": 1,
-        "value2": "2",
-        "value3": [
-          1, true, "ABC"
-        ]
-      }
-    }
-  )");
-  auto de = json_deserializer(ss);
-  auto jj = de.getJson();
-  printValue<int>(jj.find("user_id"));
-
-  printValue<int>(jj.find("obj.value1"));
-
-  auto value3 = jj.find("obj.value3");
-  auto value3_arr = value3->getValue<json::array_type>();
-  printValue<int>(value3_arr[0]);
-  printValue<std::string>(value3_arr[2]);  
-}
-
-void test_3() {
+void test_006() {
   {
     json x({1, 2, 3});
-    printValue<int>(x.getValue<json::array_type>()[2]);
+    printValue<int>(x.get<json::array_type>()[2]);
   }
   {
     json x({ "a", "b", "c"});
-    printValue<std::string>(x.getValue<json::array_type>()[1]);
+    printValue<std::string>(x.get<json::array_type>()[1]);
   }
 
   {
@@ -156,30 +128,69 @@ void test_3() {
         {"2", "2.0"}
       }}
     };
-    printValue<double>(x.find("ccc")->getValue<json::array_type>()[1]);
-    printValue<int>(x.find("ddd")->getValue<json::array_type>()[1]);
+    printValue<double>(x.find("ccc")->get<json::array_type>()[1]);
+    printValue<int>(x.find("ddd")->get<json::array_type>()[1]);
   }
   {
     json y = {1, "abc", true};
     json x;
     x = 1;
-    x.setValue({{"aa", 2.54}, {"bbb", true}});
-    x.setValue({1, 2, "true", true});
+    x.set({{"aa", 2.54}, {"bbb", true}});
+    x.set({1, 2, "true", true});
     x = {1, "abc"};
     x = {{"aa", 1}, {"bb", 22}};
   }
 }
 
+void test_007() {
+  std::stringstream ss(R"(
+    {
+      "user_id": 123, 
+      "name": "Alice",
+      "obj": {
+        "value1": 1,
+        "value2": "2",
+        "value3": [
+          1, true, "ABC"
+        ]
+      }
+    }
+  )");
+  auto de = deserializer(ss);
+  auto jj = de.value();
+  printValue<int>(jj.find("user_id"));
+
+  printValue<int>(jj.find("obj.value1"));
+
+  auto value3 = jj.find("obj.value3");
+  auto value3_arr = value3->get<json::array_type>();
+  printValue<int>(value3_arr[0]);
+  printValue<std::string>(value3_arr[2]);  
+}
+
+
 int main(void) {
 
-  std::cout << "********** test_1() **********" << std::endl;
-  test_1();
+  std::cout << "********** test_001() **********" << std::endl;
+  test_001();
 
-  std::cout << "********** test_2() **********" << std::endl;
-  test_2();
+  std::cout << "********** test_002() **********" << std::endl;
+  test_002();
 
-  std::cout << "********** test_3() **********" << std::endl;
-  test_3();
+  std::cout << "********** test_003() **********" << std::endl;
+  test_003();
+
+  std::cout << "********** test_004() **********" << std::endl;
+  test_004();
+
+  std::cout << "********** test_005() **********" << std::endl;
+  test_005();
+
+  std::cout << "********** test_006() **********" << std::endl;
+  test_006();
+
+  std::cout << "********** test_007() **********" << std::endl;
+  test_007();
 
   return 0;
 }
