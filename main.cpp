@@ -1,5 +1,7 @@
 #include "cppjson/cppjson.h"
 #include <iostream>
+#include <map>
+#include <list>
 
 using namespace cppjson;
 
@@ -168,6 +170,39 @@ void test_007() {
   printValue<std::string>(value3_arr[2]);  
 }
 
+void test_008() {
+  json j;
+  j["abc"]["def"] = 123456;
+  printValue<int>(j.find("abc.def"));
+
+  bool b = j[std::string("ddd")].is_undefined();
+  std::cout << b << std::endl;
+}
+
+
+void test_009() {
+  json j;
+  j[1][0] = 555;
+  printValue<int>(j[1][0]);
+  printValue<nullptr_t>(j[0]);
+
+  /** TODO: 何故か 非const が呼び出されてしまう */
+  const bool b = j[50].is_undefined();
+  std::cout << b << std::endl;
+}
+
+void test_010() {
+  /** 下記はコンパイルエラーとする */
+  /** TODO: 必要ならヘルパ関数を用意しようかしら */
+  // std::map<std::string, int> a{{"a", 1}, {"b", 2}};
+  // json j = std::move(a);
+  // printValue<int>(j.find("a"));
+
+  // std::vector<double> b = {123.45, 678.91};
+  // json jj = b;
+  // printValue<double>(jj[1]);
+}
+
 
 int main(void) {
 
@@ -191,6 +226,15 @@ int main(void) {
 
   std::cout << "********** test_007() **********" << std::endl;
   test_007();
+
+  std::cout << "********** test_008() **********" << std::endl;
+  test_008();
+
+  std::cout << "********** test_009() **********" << std::endl;
+  test_009();
+
+  std::cout << "********** test_010() **********" << std::endl;
+  test_010();
 
   return 0;
 }

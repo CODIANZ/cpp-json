@@ -111,13 +111,27 @@ private:
   }
 
   /** json の配列による設定の継続処理 */
-  template <typename T, typename ...TARGS> void pushValues(array_type& arr, const T& v, TARGS ...vargs){
-    arr.push_back(v);
-    pushValues(arr, std::forward<TARGS>(vargs)...);
+  template <typename T, typename ...ARGS> void pushValues(array_type& arr, const T& v, ARGS ...args){
+    pushTypedValue(arr, v);
+    pushValues(arr, std::forward<ARGS>(args)...);
   }
 
   /** json の配列による設定のゴール地点 */
   void pushValues(array_type& arr) {};
+
+  /** 許容される型のみ arr に追加する。（追加できない型はコンパイルエラー） */
+  template <
+    typename T,
+    std::enable_if_t<
+      is_integer_compatible<T>::value |
+      is_floating_point_compatible<T>::value |
+      is_available_type<T>::value |
+      std::is_same<T, const char*>::value
+      , bool
+    > = true
+  > void pushTypedValue(array_type& arr, const T& v) {
+    arr.push_back(json(v));
+  }
 
   /** 型変換不能エラー */
   template<typename T> [[noreturn]] static void throw_bad_cast(const std::string& from) {
@@ -156,11 +170,14 @@ public:
     m_value.reset(new value_container<object_type>(list));
   }
 
-  /* json の配列は許容可能な型が混在しているため、 initializer_list は使用せず可変引数テンプレートで逐次処理を行う */
-  template <typename ...TARGS> json(TARGS ...vargs) {
+  /**
+   * json の配列は許容可能な型が混在しているため、 initializer_list は使用せず可変引数テンプレートで逐次処理を行う。
+   * 可変引数テンプレートでは、各引数の型チェックが行えないため pushTypedValue() にて静的チェックを行う。
+   **/
+  template <typename ...ARGS> json(ARGS ...args) {
     m_value.reset(new value_container<array_type>({}));
     auto& arr = get<array_type>();
-    pushValues(arr, std::forward<TARGS>(vargs)...);
+    pushValues(arr, std::forward<ARGS>(args)...);
   }
 
   ~json() = default;
@@ -202,11 +219,12 @@ public:
     return avalue->value;
   }
 
-
   /************** メモリ管理 ***************/
   /** 自身を複製する（deep copy） */
   json clone() const {
-    return json(m_value->clone());
+    json j;
+    j.m_value.reset(m_value->clone());
+    return j;
   }
 
   /** 保持している値を開放し、開放された値を返却する。 json は undefined となる */
@@ -260,6 +278,61 @@ public:
       return obj.find(left)->second.find(right, separator);
     }
   }
+
+
+  /************** operator [] ***************/
+  /** object型に対する [] アクセス */
+
+  /** const では見つからない場合、 undefined を返却する */
+  const json& operator [](const char * key) const {
+    static const json undefined;
+    if(value_type() != value_type::object) return undefined;
+    auto&& obj = get<object_type>();
+    auto it = obj.find(key);
+    return it != obj.end() ? it->second : undefined;
+  }
+
+  const json& operator [](const std::string& key) const {
+    return (*this)[key.c_str()];
+  }
+
+  /** 非const では見つからない場合、 object を作成する */
+  json& operator [](const char * key) {
+    if(value_type() != value_type::object){
+      m_value.reset(new value_container<object_type>({}));
+    }
+    auto&& obj = get<object_type>();
+    auto it = obj.find(key);
+    if(it != obj.end()) return it->second;
+    obj[key] = undefined_type{};
+    return obj[key];
+  }
+
+  json& operator [](const std::string& key) {
+    return (*this)[key.c_str()];
+  }
+
+  /** array型に対する [] アクセス */
+
+  /** const では見つからない場合、 undefined を返却する */
+  const json& operator [](int index) const {
+    static const json undefined;
+    if(value_type() != value_type::array) return undefined;
+    auto&& arr = get<array_type>();
+    return (index < arr.size()) ? arr[index] : undefined;
+  }
+
+  /** 非const では見つからない場合、 欠番を nullptr で埋める */
+  json& operator [](int index) {
+    if(value_type() != value_type::array){
+      m_value.reset(new value_container<array_type>({}));
+    }
+    auto&& arr = get<array_type>();
+    if(index < arr.size()) return arr[index];
+    arr.resize(index + 1, json(nullptr));
+    return arr[index];
+  }
+
 };
 } /** namespace cppjson */
 
