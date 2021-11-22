@@ -136,124 +136,61 @@ private:
     return ivalue ? static_cast<T>(ivalue->value) : static_cast<T>(fvalue->value);
   }
 
-  /** value_container_base は型消去されており、生成に型制約が存在しないので、外部公開は行わない */
-  json(value_container_base* v) : m_value(v) {};
+  /** json の配列による設定の継続処理 */
+  template <typename T, typename ...TARGS> void pushValues(array_type& arr, const T& v, TARGS ...vargs){
+    arr.push_back(v);
+    pushValues(arr, vargs...);
+  }
+
+  /** json の配列による設定のゴール地点 */
+  void pushValues(array_type& arr) {};
+
 
 protected:
 
 public:
   json() : m_value(new value_container<undefined_type>({})) {}
   json(const json& s) : m_value(s.m_value->clone()) {}
+  json(json&& s) : m_value(s.m_value.release()) {}
 
-  /** 許容される値で構築（型の妥当性は setValue に委譲） */
-  template <typename T> json(const T& v) {
-    setValue(v);
-  }
+  /** 整数型（内部では int64_t） */
+  template <typename T, std::enable_if_t<is_integer_compatible<T>::value, bool> = true>
+  json(const T& v) { m_value.reset(new value_container<int64_t>(static_cast<int64_t>(v))); }
+
+  /** 浮動小数点型（内部では double） */
+  template <typename T, std::enable_if_t<is_floating_point_compatible<T>::value, bool> = true>
+  json(const T& v) { m_value.reset(new value_container<double>(static_cast<double>(v))); }
+
+  /** その他の許容可能な型 */
+  template <typename T, std::enable_if_t<is_available_type<T>::value, bool> = true>
+  json(const T& v) { m_value.reset(new value_container<T>(v)); }
+
+  /** C文字列を受け入れる（内部では std::string） */
+  json(const char* v) { m_value.reset(new value_container<std::string>(v)); }
 
   /** object型の initialize_list で構築*/
-  json(const std::initializer_list<object_type::value_type>& list){
-    setValue(list);
+  json(const std::initializer_list<object_type::value_type>& list) {
+    m_value.reset(new value_container<object_type>(list));
   }
 
-  /**
-   * json の initializer_list で構築
-   * TODO: これが実現できると `json x = {1, true, "123"};` 的な表現が可能になる。
-   * しかし、{"aaa", 1} という表現が連想配列なのか、単に配列なのかが不明瞭でコンパイルエラーになる。
-   * したがって、現在は保留とする。
-   **/
-  // json(const std::initializer_list<json>& list) {
-  //   setValue(list);
-  // }
-
-  /* avalable_type と変換可能な値の initializer_list で構築（型の妥当性は setValue に委譲） */
-  template <typename T> json(const std::initializer_list<T>& list) {
-    setValue(list);
+  /* json の配列は許容可能な型が混在しているため、 initializer_list は使用せず可変引数テンプレートで逐次処理を行う */
+  template <typename ...TARGS> json(TARGS ...vargs) {
+    m_value.reset(new value_container<array_type>({}));
+    auto& arr = getValue<array_type>();
+    pushValues(arr, vargs...);
   }
 
   ~json() = default;
 
   /************** 設定（関数） ***************/
-  /** 整数型（内部では int64_t） */
-  template <typename T, std::enable_if_t<is_integer_compatible<T>::value, bool> = true>
-  void setValue(const T& v) { m_value.reset(new value_container<int64_t>(static_cast<int64_t>(v))); }
-
-  /** 浮動小数点型（内部では double） */
-  template <typename T, std::enable_if_t<is_floating_point_compatible<T>::value, bool> = true>
-  void setValue(const T& v) { m_value.reset(new value_container<double>(static_cast<double>(v))); }
-
-  /** その他の許容可能な型 */
-  template <typename T, std::enable_if_t<is_available_type<T>::value, bool> = true>
-  void setValue(const T& v) { m_value.reset(new value_container<T>(v)); }
-
-  /** C文字列を受け入れる（内部では std::string） */
-  void setValue(const char* v){ m_value.reset(new value_container<std::string>(v)); }
-
-  /** object型の initialize_list */
-  void setValue(const std::initializer_list<object_type::value_type>& list){
-    m_value.reset(new value_container<object_type>(list));
-  }
-
-  /** json の initializer_list */
-  // void setValue(const std::initializer_list<json>& list) {  
-  //   m_value.reset(new value_container<array_type>(list));
-  // }
-
-  /* avalable_type と変換可能な値の initializer_list */
-  template <typename T, std::enable_if_t<
-    is_available_type<T>::value ||
-    is_integer_compatible<T>::value ||
-    is_floating_point_compatible<T>::value ||
-    std::is_same<T, const char*>::value
-    , bool> = true>
-  void setValue(const std::initializer_list<T>& list) {  
-    auto arr = std::unique_ptr<value_container<array_type>>(new value_container<array_type>({}));
-    auto it = list.begin();
-    for(auto it = list.begin(); it != list.end(); it++){
-      arr->value.push_back(json(*it));
-    }
-    m_value.reset(arr.release());
-  }
+  void setValue(const json& j) { m_value.reset(j.m_value->clone()); }
+  void setValue(json&& j) { m_value.reset(j.m_value.release()); }
 
 
   /************** 設定（代入） ***************/
-  /** 整数型（内部では int64_t） */
-  template <typename T, std::enable_if_t<is_integer_compatible<T>::value, bool> = true>
-  json& operator =(const T& v) { setValue(v); return *this; }
+  json& operator =(const json& j) { setValue(j); return *this; }
+  json& operator =(json&& j) { setValue(j); return *this; }
 
-  /** 浮動小数点型（内部では double） */
-  template <typename T, std::enable_if_t<is_floating_point_compatible<T>::value, bool> = true>
-  json& operator =(const T& v) { setValue(v); return *this; }
-
-  /** その他の許容可能な型 */
-  template <typename T, std::enable_if_t<is_available_type<T>::value, bool> = true>
-  json& operator =(const T& v) { setValue(v); return *this; }
-
-  /** C文字列を受け入れる（内部では std::string） */
-  json& operator =(const char* v) { setValue(v); return *this; }
-
-  /** object型の initialize_list */
-  json& operator =(const std::initializer_list<object_type::value_type>& list){
-    setValue(list);
-    return *this;
-  }
-
-  /** json の initializer_list */
-  // json& operator =(const std::initializer_list<json>& list) {  
-  //   setValue(list);
-  //   return *this;
-  // }
-
-  /* avalable_type と変換可能な数値の initializer_list */
-  template <typename T, std::enable_if_t<
-    is_available_type<T>::value ||
-    is_integer_compatible<T>::value ||
-    is_floating_point_compatible<T>::value ||
-    std::is_same<T, const char*>::value
-    , bool> = true>
-  json& operator =(const std::initializer_list<T>& list) {  
-    setValue(list);
-    return *this;
-  }
 
   /************** 取得 ***************/
   /** 整数型（int_64tからの型変換を許容するため参照ではなく値のコピーを返却する点に注意） */
