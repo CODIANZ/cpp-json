@@ -171,8 +171,9 @@ public:
   }
 
   /**
-   * json の配列は許容可能な型が混在しているため、 initializer_list は使用せず可変引数テンプレートで逐次処理を行う。
+   * json の配列は許容可能な型が混在しているため、 initializer_list は使用せず可変引数テンプレートで再帰処理を行う。
    * 可変引数テンプレートでは、各引数の型チェックが行えないため pushTypedValue() にて静的チェックを行う。
+   * （まぁ、この関数内で static_asster 使っても良いかもだけど）
    **/
   template <typename ...ARGS> json(ARGS ...args) {
     m_value.reset(new value_container<array_type>({}));
