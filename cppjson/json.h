@@ -119,18 +119,18 @@ private:
   /** json の配列による設定のゴール地点 */
   void pushValues(array_type& arr) {};
 
-  /** 許容される型のみ arr に追加する。（追加できない型はコンパイルエラー） */
+  /** 許容される型のみ arr に追加（追加できない型はコンパイルエラー） */
   template <
     typename T,
     std::enable_if_t<
-      is_integer_compatible<T>::value |
-      is_floating_point_compatible<T>::value |
-      is_available_type<T>::value |
+      is_integer_compatible<T>::value ||
+      is_floating_point_compatible<T>::value ||
+      is_available_type<T>::value ||
       std::is_same<T, const char*>::value
       , bool
     > = true
   > void pushTypedValue(array_type& arr, const T& v) {
-    arr.push_back(json(v));
+    arr.push_back(v);
   }
 
   /** 型変換不能エラー */
