@@ -209,6 +209,26 @@ void test_010() {
 }
 
 
+void test_011() {
+  json j = {
+    {"a",  "_a"},
+    {"b", {
+      {"b1", "_b1"}
+    }}
+  };
+  json jj = j.clone();
+
+  path_util::put(j, "b.b2", "_b2");
+  printValue<std::string>(path_util::find(j, "a"));
+  printValue<std::string>(path_util::find(j, "b.b1"));
+  printValue<std::string>(path_util::find(j, "b.b2"));
+
+  printValue<std::string>(path_util::find(jj, "a"));
+  printValue<std::string>(path_util::find(jj, "b.b1"));
+  printValue<std::string>(path_util::find(jj, "b.b2")); /** nullptr */
+}
+
+
 int main(void) {
 
   std::cout << "********** test_001() **********" << std::endl;
@@ -240,6 +260,9 @@ int main(void) {
 
   std::cout << "********** test_010() **********" << std::endl;
   test_010();
+
+  std::cout << "********** test_011() **********" << std::endl;
+  test_011();
 
   return 0;
 }
