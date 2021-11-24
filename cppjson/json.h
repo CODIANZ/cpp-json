@@ -225,7 +225,7 @@ public:
   json clone() const {
     json j;
     j.m_value.reset(m_value->clone());
-    return std::move(j);
+    return j;
   }
 
   /** 保持している値を開放し、開放された値を返却する。 json は undefined となる */
