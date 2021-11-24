@@ -64,7 +64,9 @@
     "__memory": "cpp",
     "__tree": "cpp",
     "map": "cpp",
-    "list": "cpp"
+    "list": "cpp",
+    "memory_resource": "cpp",
+    "__functional_03": "cpp"
   },
   "C_Cpp.errorSquiggles": "Disabled"
 }

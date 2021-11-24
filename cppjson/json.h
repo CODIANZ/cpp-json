@@ -247,39 +247,6 @@ public:
 
   operator bool() const { return is_null_or_undefined(); }
 
-  /************** プロパティ検索 ***************/
-  /** object型に対する値の検索（const） */
-  const json* find(const std::string& path, const char separator = '.') const {
-    if(value_type() != value_type::object) return nullptr;
-    const auto pos = path.find(separator);
-    auto&& obj = get<object_type>();
-    if(pos == std::string::npos){
-      auto it = obj.find(path);
-      return it != obj.end() ? &it->second : nullptr;
-    }
-    else{
-      const auto left = path.substr(0, pos);
-      const auto right = path.substr(pos + 1);
-      return obj.find(left)->second.find(right, separator);
-    }
-  }
-
-  /** object型に対する値の検索（非const） */
-  json* find(const std::string& path, const char separator = '.') {
-    if(value_type() != value_type::object) return nullptr;
-    const auto pos = path.find(separator);
-    auto&& obj = get<object_type>();
-    if(pos == std::string::npos){
-      auto it = obj.find(path);
-      return it != obj.end() ? &it->second : nullptr;
-    }
-    else{
-      const auto left = path.substr(0, pos);
-      const auto right = path.substr(pos + 1);
-      return obj.find(left)->second.find(right, separator);
-    }
-  }
-
 
   /************** operator [] ***************/
   /** object型に対する [] アクセス */

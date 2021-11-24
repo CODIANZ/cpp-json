@@ -116,8 +116,8 @@ void test_006() {
       {"abc", 1},
       {"aaa", "aaa"}
     });
-    printValue<int>(x.find("abc"));
-    printValue<std::string>(x.find("aaa"));
+    printValue<int>(path_util::find(x, "abc"));
+    printValue<std::string>(path_util::find(x, "aaa"));
   }
   {
     json x = {
@@ -130,8 +130,8 @@ void test_006() {
         {"2", "2.0"}
       }}
     };
-    printValue<double>(x.find("ccc")->get<json::array_type>()[1]);
-    printValue<int>(x.find("ddd")->get<json::array_type>()[1]);
+    printValue<double>(path_util::find(x, "ccc")->get<json::array_type>()[1]);
+    printValue<int>(path_util::find(x, "ddd")->get<json::array_type>()[1]);
   }
   {
     json y = {1, "abc", true};
@@ -160,11 +160,11 @@ void test_007() {
   )");
   auto de = deserializer(ss);
   auto jj = de.value();
-  printValue<int>(jj.find("user_id"));
+  printValue<int>(path_util::find(jj, "user_id"));
 
-  printValue<int>(jj.find("obj.value1"));
+  printValue<int>(path_util::find(jj, "obj.value1"));
 
-  auto value3 = jj.find("obj.value3");
+  auto value3 = path_util::find(jj, "obj.value3");
   auto value3_arr = value3->get<json::array_type>();
   printValue<int>(value3_arr[0]);
   printValue<std::string>(value3_arr[2]);  
@@ -173,7 +173,7 @@ void test_007() {
 void test_008() {
   json j;
   j["abc"]["def"] = 123456;
-  printValue<int>(j.find("abc.def"));
+  printValue<int>(path_util::find(j, "abc.def"));
 
   bool b = j[std::string("ddd")].is_undefined();
   std::cout << b << std::endl;
@@ -186,21 +186,26 @@ void test_009() {
   printValue<int>(j[1][0]);
   printValue<nullptr_t>(j[0]);
 
-  /** TODO: 何故か 非const が呼び出されてしまう */
+  const auto& jj = j;
+
+  const auto bb = jj[50];
+  std::cout << bb.is_null_or_undefined() << std::endl;
+
   const bool b = j[50].is_undefined();
   std::cout << b << std::endl;
 }
 
 void test_010() {
-  /** 下記はコンパイルエラーとする */
-  /** TODO: 必要ならヘルパ関数を用意しようかしら */
-  // std::map<std::string, int> a{{"a", 1}, {"b", 2}};
-  // json j = std::move(a);
-  // printValue<int>(j.find("a"));
-
-  // std::vector<double> b = {123.45, 678.91};
-  // json jj = b;
-  // printValue<double>(jj[1]);
+  json j = {
+    {"a",  "_a"},
+    {"b", {
+      {"b1", "_b1"}
+    }}
+  };
+  path_util::put(j, "b.b2", "_b2");
+  printValue<std::string>(path_util::find(j, "a"));
+  printValue<std::string>(path_util::find(j, "b.b1"));
+  printValue<std::string>(path_util::find(j, "b.b2"));
 }
 
 

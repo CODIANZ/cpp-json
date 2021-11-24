@@ -3,6 +3,7 @@
 
 #include "errors.h"
 #include "json.h"
+#include "path_util.h"
 #include "deserializer.h"
 
 
