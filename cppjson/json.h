@@ -62,6 +62,7 @@ private:
   public:
     T value;
     value_container(const T& v) : value(v) {};
+    value_container(T&& v) : value(std::move(v)) {};
     virtual ~value_container() = default;
     virtual value_container_base* clone() const {
       return new value_container<T>(value);
@@ -161,6 +162,10 @@ public:
   /** その他の許容可能な型 */
   template <typename T, std::enable_if_t<is_available_type<T>::value, bool> = true>
   json(const T& v) { m_value.reset(new value_container<T>(v)); }
+
+  /** その他の許容可能な型（右辺値） */
+  template <typename T, std::enable_if_t<is_available_type<T>::value, bool> = true>
+  json(T&& v) { m_value.reset(new value_container<T>(std::move(v))); }
 
   /** C文字列を受け入れる（内部では std::string） */
   json(const char* v) { m_value.reset(new value_container<std::string>(v)); }

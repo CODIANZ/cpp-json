@@ -228,6 +228,14 @@ void test_011() {
   printValue<std::string>(path_util::find(jj, "b.b2")); /** nullptr */
 }
 
+void test_012() {
+  const std::string s = "123";
+  auto j = json(s);       /** コピーコンストラクタ */
+  printValue<std::string>(j);
+  auto jj = json(std::string("abc")); /** 右辺値コンストラクタ */
+  printValue<std::string>(jj);
+}
+
 
 int main(void) {
 
@@ -263,6 +271,10 @@ int main(void) {
 
   std::cout << "********** test_011() **********" << std::endl;
   test_011();
+
+  std::cout << "********** test_012() **********" << std::endl;
+  test_012();
+
 
   return 0;
 }
