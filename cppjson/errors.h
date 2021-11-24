@@ -35,6 +35,14 @@ private:
   bad_cast(const std::string& s) : error(s) {}
 };
 
+/** deserializerのエラー */
+class bad_json : public error {
+friend class deserializer;
+private:
+  bad_json(const std::string& s) : error(s) {}
+};
+
+
 } /** namespace cppjson */
 
 #endif /** !defined(__cppjson_h_error__) */

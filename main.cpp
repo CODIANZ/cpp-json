@@ -153,18 +153,17 @@ void test_007() {
         "value1": 1,
         "value2": "2",
         "value3": [
-          1, true, "ABC"
+          1, true, "ABC\n\u03A9DEF"
         ]
       }
     }
   )");
-  auto de = deserializer(ss);
-  auto jj = de.value();
+  auto jj = deserializer(ss).execute();
   printValue<int>(path_util::find(jj, "user_id"));
 
   printValue<int>(path_util::find(jj, "obj.value1"));
 
-  auto value3 = path_util::find(jj, "obj.value3");
+  auto value3 = path_util::find(jj, "obj.value3");  /** u03A9 -> 0xCE, 0xA9 */
   auto value3_arr = value3->get<json::array_type>();
   printValue<int>(value3_arr[0]);
   printValue<std::string>(value3_arr[2]);  
