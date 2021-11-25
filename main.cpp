@@ -156,7 +156,8 @@ void test_007() {
         "value3": [
           1, true, /* comment */ "ABC\n\u03A9DEF"
         ]
-      }
+      },
+      "\r\nkey" : null
     }
   )");
   auto jj = deserializer(ss).execute();

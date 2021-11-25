@@ -33,16 +33,7 @@ private:
     void next(std::size_t n) {
       if(m_buff[0] == -1) return;
 
-      for(auto i = 0; i < n; i++){
-        const char c = static_cast<char>(m_buff[i]);
-        if(c == '\n'){  /* \rのみは改行としない（\rのみの改行マークって、Macintoshくらいかな？） */
-          m_line++;
-          m_col = 0;
-        }
-        else{
-          m_col++;
-        }
-      }
+      m_col += n;
 
       for(auto i = n; i < m_buff.size(); i++){
         m_buff[i - n] = m_buff[i];
@@ -58,6 +49,11 @@ private:
           m_buff[i] = -1;
         }
       }
+    }
+
+    void newLine() {
+      m_line++;
+      m_col = 0;
     }
 
     char operator [](std::size_t n) const{
@@ -95,10 +91,6 @@ private:
 
   static bool is_blacket(char c) {
     return c == '\"';
-  }
-
-  static bool is_space(char c){
-    return std::isspace(c);
   }
 
   static bool is_number_parts(char c){
@@ -239,14 +231,14 @@ private:
 
     enum class mode {
       find_key_or_close,
-      proceed_key,
       find_separator,
       find_comma_or_close
     };
     mode m = mode::find_key_or_close;
 
-    std::stringstream key;
+    json key;
     while(!m_stream.eof()){
+      skip_space_or_comment();
       const char c = m_stream[0];
       switch(m){
         case mode::find_key_or_close: {
@@ -256,31 +248,11 @@ private:
             return;
           }  
           else if(is_blacket(c)) {
-            m_stream.next(1);
-            m = mode::proceed_key;
-          }
-          else if(is_space(c)) {
-            m_stream.next(1);
-          }
-          else if(c == '/' && m_stream[1] == '*'){
-            skip_block_comment();
-          }
-          else if(c == '/' && m_stream[1] == '/'){
-            skip_line_comment();
+            deserialize_string(key);
+            m = mode::find_separator;
           }
           else {
             throwError("syntax error");
-          }
-          break;
-        }
-        case mode::proceed_key: {
-          if(is_blacket(c)){
-            m_stream.next(1);
-            m = mode::find_separator;
-          }
-          else{
-            m_stream.next(1);
-            key << c;
           }
           break;
         }
@@ -289,19 +261,8 @@ private:
             m_stream.next(1);
             json inner;
             deserialize(inner);
-            obj.insert({key.str(), inner});
-            key.str("");
-            key.clear();
+            obj.insert({key.get<std::string>(), inner});
             m = mode::find_comma_or_close;
-          }
-          else if(is_space(c)){
-            m_stream.next(1);
-          }
-          else if(c == '/' && m_stream[1] == '*'){
-            skip_block_comment();
-          }
-          else if(c == '/' && m_stream[1] == '/'){
-            skip_line_comment();
           }
           else {
             throwError("syntax error");
@@ -318,15 +279,6 @@ private:
             m_stream.next(1);
             m = mode::find_key_or_close;
           }
-          else if(is_space(c)) {
-            m_stream.next(1);
-          }
-          else if(c == '/' && m_stream[1] == '*'){
-            skip_block_comment();
-          }
-          else if(c == '/' && m_stream[1] == '/'){
-            skip_line_comment();
-          }
           else {
             throwError("syntax error");
           }
@@ -342,6 +294,7 @@ private:
     m_stream.next(1); /** [ をスキップ */
     auto arr = json::array_type();
     while(!m_stream.eof()){
+      skip_space_or_comment();
       const char c = m_stream[0];
       if(c == ']'){
         m_stream.next(1);
@@ -356,15 +309,6 @@ private:
         else{
           m_stream.next(1);
         }
-      }
-      else if(is_space(c)){
-        m_stream.next(1);
-      }
-      else if(c == '/' && m_stream[1] == '*'){
-        skip_block_comment();
-      }
-      else if(c == '/' && m_stream[1] == '/'){
-        skip_line_comment();
       }
       else{
         json inner;
@@ -388,6 +332,9 @@ private:
       }
       else if(c == '\\'){
         unescape(ss);
+      }
+      else if(c == '\r' || c == '\n' || c == '\b' || c == '\f' || c == '\t' ){
+        throwError("string literal cannot contain control codes.");
       }
       else{
         m_stream.next(1);
@@ -440,11 +387,48 @@ private:
     }
   } 
 
+  void skip_space_or_comment() {
+    while(!m_stream.eof()){
+      const char c1 = m_stream[0];
+      const char c2 = m_stream[1];
+      if(c1 == '\r' && c2 == '\n'){
+        m_stream.next(2);
+        m_stream.newLine();
+      }
+      else if(c1 == '\r' || c1 == '\n') {
+        m_stream.next(1);
+        m_stream.newLine();
+      }
+      else if(std::isspace(c1)){
+        m_stream.next(1);
+      }
+      else if(c1 == '/' && c2 == '*'){
+        skip_block_comment();
+      }
+      else if(c1 == '/' && c2 == '/'){
+        skip_line_comment();
+      }
+      else {
+        break;
+      }
+    }
+  }
+
   void skip_block_comment()
   {
     m_stream.next(2); /** 開始マークをスキップ */
     while(!m_stream.eof()) {
-      if(m_stream[0] == '*' && m_stream[1] == '/'){
+      const char c1 = m_stream[0];
+      const char c2 = m_stream[1];
+      if(c1 == '\r' && c2 == '\n'){
+        m_stream.next(2);
+        m_stream.newLine();
+      }
+      else if(c1 == '\r' || c1 == '\n') {
+        m_stream.next(1);
+        m_stream.newLine();
+      }
+      else if(c1 == '*' && c2 == '/'){
         m_stream.next(2);
         break;
       }
@@ -456,11 +440,13 @@ private:
   {
     m_stream.next(2); /** 開始マークをスキップ */
     while(!m_stream.eof()) {
-      if(m_stream[0] == '\r' && m_stream[1] == '\n'){
+      const char c1 = m_stream[0];
+      const char c2 = m_stream[1];
+      if(c1 == '\r' && c2 == '\n'){
         m_stream.next(2);
         break;
       }
-      if(m_stream[0] == '\r' || m_stream[0] == '\n') {
+      if(c1 == '\r' || c1 == '\n') {
         m_stream.next(1);
         break;
       }
@@ -471,8 +457,8 @@ private:
   void deserialize(json& j)
   {
     while(!m_stream.eof()){
+      skip_space_or_comment();
       const char c = m_stream[0];
-
       if(c == '{'){
         deserialize_object(j);
         return;
@@ -496,12 +482,6 @@ private:
         j.set(nullptr);
         return;
       }
-      else if(c == '/' && m_stream[1] == '*'){
-        skip_block_comment();
-      }
-      else if(c == '/' && m_stream[1] == '/'){
-        skip_line_comment();
-      }
       else if(is_blacket(c)){
         deserialize_string(j);
         return;
@@ -509,9 +489,6 @@ private:
       else if(is_number_parts(c)){
         deserialize_number(j);
         return;
-      }
-      else if(is_space(c)){
-        m_stream.next(1);
       }
       else{
         throwError("syntax error");
