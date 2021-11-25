@@ -35,7 +35,7 @@ private:
 
       for(auto i = 0; i < n; i++){
         const char c = static_cast<char>(m_buff[i]);
-        if(c == '\n'){
+        if(c == '\n'){  /* \rのみは改行としない（\rのみの改行マークって、Macintoshくらいかな？） */
           m_line++;
           m_col = 0;
         }
@@ -262,6 +262,12 @@ private:
           else if(is_space(c)) {
             m_stream.next(1);
           }
+          else if(c == '/' && m_stream[1] == '*'){
+            skip_block_comment();
+          }
+          else if(c == '/' && m_stream[1] == '/'){
+            skip_line_comment();
+          }
           else {
             throwError("syntax error");
           }
@@ -291,6 +297,12 @@ private:
           else if(is_space(c)){
             m_stream.next(1);
           }
+          else if(c == '/' && m_stream[1] == '*'){
+            skip_block_comment();
+          }
+          else if(c == '/' && m_stream[1] == '/'){
+            skip_line_comment();
+          }
           else {
             throwError("syntax error");
           }
@@ -308,6 +320,12 @@ private:
           }
           else if(is_space(c)) {
             m_stream.next(1);
+          }
+          else if(c == '/' && m_stream[1] == '*'){
+            skip_block_comment();
+          }
+          else if(c == '/' && m_stream[1] == '/'){
+            skip_line_comment();
           }
           else {
             throwError("syntax error");
@@ -341,6 +359,12 @@ private:
       }
       else if(is_space(c)){
         m_stream.next(1);
+      }
+      else if(c == '/' && m_stream[1] == '*'){
+        skip_block_comment();
+      }
+      else if(c == '/' && m_stream[1] == '/'){
+        skip_line_comment();
       }
       else{
         json inner;
@@ -416,6 +440,34 @@ private:
     }
   } 
 
+  void skip_block_comment()
+  {
+    m_stream.next(2); /** 開始マークをスキップ */
+    while(!m_stream.eof()) {
+      if(m_stream[0] == '*' && m_stream[1] == '/'){
+        m_stream.next(2);
+        break;
+      }
+      m_stream.next(1);
+    }
+  }
+
+  void skip_line_comment()
+  {
+    m_stream.next(2); /** 開始マークをスキップ */
+    while(!m_stream.eof()) {
+      if(m_stream[0] == '\r' && m_stream[1] == '\n'){
+        m_stream.next(2);
+        break;
+      }
+      if(m_stream[0] == '\r' || m_stream[0] == '\n') {
+        m_stream.next(1);
+        break;
+      }
+      m_stream.next(1);
+    }
+  }
+
   void deserialize(json& j)
   {
     while(!m_stream.eof()){
@@ -443,6 +495,12 @@ private:
         check_value("null");
         j.set(nullptr);
         return;
+      }
+      else if(c == '/' && m_stream[1] == '*'){
+        skip_block_comment();
+      }
+      else if(c == '/' && m_stream[1] == '/'){
+        skip_line_comment();
       }
       else if(is_blacket(c)){
         deserialize_string(j);

@@ -147,13 +147,14 @@ void test_006() {
 void test_007() {
   std::stringstream ss(R"(
     {
-      "user_id": 123, 
-      "name": "Alice",
+      "user_id": 123,   /* abc
+      ****/
+      "name": "Alice", // name
       "obj": {
         "value1": 1,
         "value2": "2",
         "value3": [
-          1, true, "ABC\n\u03A9DEF"
+          1, true, /* comment */ "ABC\n\u03A9DEF"
         ]
       }
     }
