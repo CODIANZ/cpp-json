@@ -5,6 +5,7 @@
 #include "json.h"
 #include "path_util.h"
 #include "deserializer.h"
+#include "serializer.h"
 
 
 #endif /** !defined(__cppjson_h_cppjson__) */

@@ -237,6 +237,21 @@ void test_012() {
   printValue<std::string>(jj);
 }
 
+void test_013() {
+  json x = {
+    {"aaa", 1},
+    {"bbb", 1.5},
+    {"ccc", {"abc", 1.234, true}},
+    {"ddd", {1, 2}},
+    {"eee", {
+      {"1", 1.0},
+      {"2", "2.0"}
+    }}
+  };
+  std::cout << serializer(x).execute() << std::endl;
+  std::cout << serializer(x, " ").execute() << std::endl;
+}
+
 
 int main(void) {
 
@@ -276,6 +291,8 @@ int main(void) {
   std::cout << "********** test_012() **********" << std::endl;
   test_012();
 
+  std::cout << "********** test_013() **********" << std::endl;
+  test_013();
 
   return 0;
 }
