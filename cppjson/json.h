@@ -21,19 +21,19 @@ public:
   /** value_container で保持している型（integral と floating_point はjsではNumber型だが、この世界では別の型として区別する） */
   enum class value_type { integral, floating_point, string, boolean, null, array, object, undefined };
 
-private:
-  /** value_container で保持できる型を制限するための判定クラス（set(), get() で使用する） */
-  template <typename T> struct is_available_type;
-  template <> struct is_available_type<std::string    > { static constexpr bool value = true; };
-  template <> struct is_available_type<bool           > { static constexpr bool value = true; };
-  template <> struct is_available_type<nullptr_t      > { static constexpr bool value = true; };
-  template <> struct is_available_type<array_type     > { static constexpr bool value = true; };
-  template <> struct is_available_type<object_type    > { static constexpr bool value = true; };
-  template <> struct is_available_type<undefined_type > { static constexpr bool value = true; };
-  template <> struct is_available_type<int64_t        > { static constexpr bool value = true; };
-  template <> struct is_available_type<double         > { static constexpr bool value = true; };
-  template <typename T> struct is_available_type        { static constexpr bool value = false;};
+  /** value_container で保持できる型を traits で列挙 */
+  template<typename T> struct value_type_traits;
+  template<> struct value_type_traits<std::string   > { static constexpr bool available = true; static constexpr const char* const name = "string"    ; static constexpr value_type type = value_type::string; };
+  template<> struct value_type_traits<int64_t       > { static constexpr bool available = true; static constexpr const char* const name = "integral"  ; static constexpr value_type type = value_type::integral; };
+  template<> struct value_type_traits<double        > { static constexpr bool available = true; static constexpr const char* const name = "double"    ; static constexpr value_type type = value_type::floating_point; };
+  template<> struct value_type_traits<bool          > { static constexpr bool available = true; static constexpr const char* const name = "bool"      ; static constexpr value_type type = value_type::boolean; };
+  template<> struct value_type_traits<nullptr_t     > { static constexpr bool available = true; static constexpr const char* const name = "null"      ; static constexpr value_type type = value_type::null; };
+  template<> struct value_type_traits<array_type    > { static constexpr bool available = true; static constexpr const char* const name = "array"     ; static constexpr value_type type = value_type::array; };
+  template<> struct value_type_traits<object_type   > { static constexpr bool available = true; static constexpr const char* const name = "object"    ; static constexpr value_type type = value_type::object; };
+  template<> struct value_type_traits<undefined_type> { static constexpr bool available = true; static constexpr const char* const name = "undefined" ; static constexpr value_type type = value_type::undefined; };
+  template<typename T> struct value_type_traits       { static constexpr bool available = false; };
 
+private:
   /** int64_t に変換可能か判定する（int64_tとboolは除外） */
   template <typename T> struct is_integer_compatible {
     static constexpr bool value = std::is_integral<T>::value && (!std::is_same<T, bool>::value) && (!std::is_same<T, int64_t>::value);
@@ -68,36 +68,10 @@ private:
       return new value_container<T>(value);
     };
     virtual enum value_type value_type() const {
-      auto&& tid = typeid(T);
-           if(tid == typeid(std::string    )) return value_type::string;
-      else if(tid == typeid(int64_t        )) return value_type::integral;
-      else if(tid == typeid(double         )) return value_type::floating_point;
-      else if(tid == typeid(bool           )) return value_type::boolean;
-      else if(tid == typeid(nullptr_t      )) return value_type::null;
-      else if(tid == typeid(array_type     )) return value_type::array;
-      else if(tid == typeid(object_type    )) return value_type::object;
-      else if(tid == typeid(undefined_type )) return value_type::undefined;
-      /** MEMO: 型制約は json 側で行われているのでここにくることは無いはず（静的チェックでコンパイルエラーになっている） */
-      bad_type::throw_error();
+      return value_type_traits<T>::type;
     }
     virtual std::string value_type_string() const {
-      return value_type_string_static();
-    }
-    static std::string value_type_string_static() {
-      auto&& tid = typeid(T);
-           if(tid == typeid(std::string    )) return "string";
-      else if(tid == typeid(int64_t        )) return "integral";
-      else if(tid == typeid(double         )) return "floating_point";
-      else if(tid == typeid(bool           )) return "boolean";
-      else if(tid == typeid(nullptr_t      )) return "null";
-      else if(tid == typeid(array_type     )) return "array";
-      else if(tid == typeid(object_type    )) return "object";
-      else if(tid == typeid(undefined_type )) return "undefined";
-      else {
-        std::stringstream ss;
-        ss << "invalid type(" << tid.name() << ")";
-        return ss.str();
-      }
+      return value_type_traits<T>::name;
     }
   };
 
@@ -126,7 +100,7 @@ private:
     std::enable_if_t<
       is_integer_compatible<T>::value ||
       is_floating_point_compatible<T>::value ||
-      is_available_type<T>::value ||
+      value_type_traits<T>::available ||
       std::is_same<T, const char*>::value
       , bool
     > = true
@@ -135,13 +109,19 @@ private:
   }
 
   /** 型変換不能エラー */
-  template<typename T> [[noreturn]] static void throw_bad_cast(const std::string& from) {
-    auto&& to = value_container<T>::value_type_string_static();
+  template<typename T, std::enable_if_t<value_type_traits<T>::available, bool> = true>
+  [[noreturn]] static void throw_bad_cast(const std::string& from) {
     std::stringstream ss;
-    ss << "bad_cast: " << from << " -> " << to;
+    ss << "bad_cast: " << from << " -> " << value_type_traits<T>::name;
     throw new bad_cast(ss.str());
   }
-
+  template<typename T, std::enable_if_t<!value_type_traits<T>::available, bool> = true>
+  [[noreturn]] static void throw_bad_cast(const std::string& from) {
+    std::stringstream ss;
+    ss << "bad_cast: " << from << " -> " << typeid(T).name();
+    throw new bad_cast(ss.str());
+  }
+  
 
 protected:
 
@@ -160,11 +140,11 @@ public:
   json(const T& v) { m_value.reset(new value_container<double>(static_cast<double>(v))); }
 
   /** その他の許容可能な型 */
-  template <typename T, std::enable_if_t<is_available_type<T>::value, bool> = true>
+  template <typename T, std::enable_if_t<value_type_traits<T>::available, bool> = true>
   json(const T& v) { m_value.reset(new value_container<T>(v)); }
 
   /** その他の許容可能な型（右辺値） */
-  template <typename T, std::enable_if_t<is_available_type<T>::value, bool> = true>
+  template <typename T, std::enable_if_t<value_type_traits<T>::available, bool> = true>
   json(T&& v) { m_value.reset(new value_container<T>(std::move(v))); }
 
   /** C文字列を受け入れる（内部では std::string） */
@@ -211,14 +191,14 @@ public:
     return getNumberValue<T>();
   }
   /** その他の許容可能な型（const） */
-  template <typename T, std::enable_if_t<is_available_type<T>::value, bool> = true>
+  template <typename T, std::enable_if_t<value_type_traits<T>::available, bool> = true>
   const T& get() const {
     auto avalue = dynamic_cast<value_container<T>*>(m_value.get());
     if(avalue == nullptr) throw_bad_cast<T>(m_value->value_type_string());
     return avalue->value;
   }
   /** その他の許容可能な型（非const） */
-  template <typename T, std::enable_if_t<is_available_type<T>::value, bool> = true>
+  template <typename T, std::enable_if_t<value_type_traits<T>::available, bool> = true>
   T& get() {
     auto avalue = dynamic_cast<value_container<T>*>(m_value.get());
     if(avalue == nullptr) throw_bad_cast<T>(m_value->value_type_string());
@@ -234,7 +214,7 @@ public:
   }
 
   /** 保持している値を開放し、開放された値を返却する。 json は undefined となる */
-  template <typename T, std::enable_if_t<is_available_type<T>::value, bool> = true>
+  template <typename T, std::enable_if_t<value_type_traits<T>::available, bool> = true>
   void release(std::unique_ptr<T>& value) {
     value.reset(m_value.release());
     m_value.reset(new value_container<undefined_type>({}));
