@@ -22,9 +22,7 @@ json を C++ で取り扱うためのライブラリです。
 
 ## 使い方
 
-### 構築
-
-#### コードでの初期化
+### コードでの初期化
 
 ```cpp
 cppjson::json x = {
@@ -38,14 +36,14 @@ cppjson::json x = {
 };
 ```
 
-#### デシリアライザを使った初期化
+### シリアライズとデシリアラズ
 
 ```cpp
 std::stringstream ss(R"(
   {
     "user_id": 123, 
-    "name": "hogehoge",
-    "obj": {
+    "name": "hogehoge" /* block comment */,
+    "obj": { // line comment
       "value1": 1,
       "value2": "2",
       "value3": [
@@ -54,9 +52,14 @@ std::stringstream ss(R"(
     }
   }
 )");
-auto de = cppjson::deserializer(ss);
-auto jj = de.value();
+/** シリアライズ */
+json j = cppjson::deserializer(ss).execute();
+/** デシリアライズ */
+std::string se = cppjson::serializer(j).execute();
 ```
+
+なお、JSON には準拠していませんが、ラインコメントとブロックコメントが便利すぎるので対応しています。
+
 
 ### 代入
 
@@ -86,6 +89,9 @@ auto y = x;
 auto z = std::move(x);
 ```
 
+数値（整数・浮動小数点）型の代入は内部で `int64_t` と `double` に `static_cast<>` して保持します。
+
+
 ### 値の取得
 
 ```cpp
@@ -93,15 +99,31 @@ cppjson::json x = 123;
 x.get<int>();
 x.get<std::string>(); /* bad_cast */
 
+/** 配列のアクセス */
 x = {1, "abc", true, nullptr};
 x.get<cppjson::json::array_type>()[0].get<int>();
 x.get<cppjson::json::array_type>()[1].get<std::string>();
 x.get<cppjson::json::array_type>()[2].get<bool>();
 x.get<cppjson::json::array_type>()[3].is_null(); /* -> true */
-
 x.get<cppjson::json::array_type>()[0].get<std::string>(); /* bad_cast */
+
+/** 省略も可能です */
+x[0].get<int>();
+x[1].get<std::string>();
+x[2].get<bool>();
+x[3].is_null();
+
+/** オブジェクト型（連想配列）のアクセス */
+x = {{"a", 1}, {"b", false}};
+x.get<cppjson::json::object_type>()["a"].get<int>();
+x.get<cppjson::json::object_type>()["b"].get<bool>();
+
+/* 省略も可能です */
+x["a"].get<int>();
+x["b"].get<bool>();
 ```
 
+基本的に参照を返却しますが、数値（整数・浮動小数点）型で `int64_t` と `double` に `static_cast<>` するため実体が返却されます。
 
 ## jsonの内部構造
 
@@ -109,16 +131,19 @@ x.get<cppjson::json::array_type>()[0].get<std::string>(); /* bad_cast */
 
 * std::string
 * bool
-* int64_t
+* int64_t (*1)
 * double
-* undefined
+* undefined (*2)
 * std::nullptr_t
 * std::vector<cppjson::json>
 * std::unordered<std::string, cppjson::json>
 
 これらの型が、型消去した状態で `std::unique_ptr<>` にて保持されている。
 
-なお、符号付整数、符号無整数は区別せず `int64_t` を採用しています。理由は符号である1ビットについて、数値範囲の云々言うのであれば、もはや多倍長演算が必要になるということじゃないかと思う次第。
+(*1) ... 符号付整数、符号無整数は区別せず `int64_t` を採用しています。理由は符号である1ビットについて、数値範囲の云々言うのであれば、もはや多倍長演算が必要になるということじゃないかと思う次第です。
+
+(*2) ... `undefined` は json には存在しませんが、オプショナル的な用法を想定しています。なので、 シリアライズ時には `null` に変換されます。
+
 
 ### 数値の取り扱い
 
