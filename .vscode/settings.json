@@ -66,7 +66,8 @@
     "map": "cpp",
     "list": "cpp",
     "memory_resource": "cpp",
-    "__functional_03": "cpp"
+    "__functional_03": "cpp",
+    "iomanip": "cpp"
   },
   "C_Cpp.errorSquiggles": "Disabled"
 }

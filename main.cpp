@@ -252,6 +252,60 @@ void test_013() {
   std::cout << serializer(x, " ").execute() << std::endl;
 }
 
+void test_014() {
+  std::vector<int> iv({1, 2, 3, 4});
+  json j = array_util::to_json(iv.begin(), iv.end());
+  std::cout << serializer(j).execute() << std::endl;
+
+  std::list<std::string> sv({"abc", "def", "ghi"});
+  j = array_util::to_json(sv);
+  std::cout << serializer(j).execute() << std::endl;
+
+  j = array_util::create([](auto& arr){
+    arr.push_back(true);
+    arr.push_back(123);
+    arr.push_back("baz");
+  });
+  std::cout << serializer(j).execute() << std::endl;
+
+  array_util::edit(j, [](auto& arr){
+    arr.pop_back();
+    arr.push_back({
+      {"inner", 1}
+    });
+  });
+  std::cout << serializer(j).execute() << std::endl;
+}
+
+void test_015() {
+  std::map<std::string,int> im({
+    {"abc", 1},
+    {"def", 2}
+  });
+  json j = object_util::to_json(im.begin(), im.end());
+  std::cout << serializer(j).execute() << std::endl;
+
+  std::map<std::string, bool> bm({
+    {"abc", true},
+    {"def", false}
+  });
+  j = object_util::to_json(bm);
+  std::cout << serializer(j).execute() << std::endl;
+
+  j = object_util::create([](auto& obj){
+    obj["foo"] = true;
+    obj["bar"] = 123;
+    obj["baz"] = "baz";
+  });
+  std::cout << serializer(j).execute() << std::endl;
+
+  object_util::edit(j, [](auto& obj){
+    obj.erase("baz");
+    obj.insert({"inner", {1, 2.4, true}});
+  });
+  std::cout << serializer(j).execute() << std::endl;
+}
+
 
 int main(void) {
 
@@ -293,6 +347,12 @@ int main(void) {
 
   std::cout << "********** test_013() **********" << std::endl;
   test_013();
+
+  std::cout << "********** test_014() **********" << std::endl;
+  test_014();
+
+  std::cout << "********** test_015() **********" << std::endl;
+  test_015();
 
   return 0;
 }
