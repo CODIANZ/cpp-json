@@ -5,21 +5,49 @@
 
 using namespace cppjson;
 
-template <typename T> void printValue(const json& j) {
+enum class compare { same, different };
+
+template<typename JSON_VALUE_TYPE, typename EXCEPTED_VALUE_TYPE> void valueValidation(const json& j, const EXCEPTED_VALUE_TYPE& exceptedValue, const compare exceptedCompareResult) {
   try{
-    std::cout << j.get<T>() << std::endl;
+    const auto& v = j.get<JSON_VALUE_TYPE>();
+    if(exceptedCompareResult == compare::same){
+      if(v == exceptedValue){
+        std::cout << "ok: " << v << std::endl;
+      }
+      else{
+        std::cerr << "ng: " << v << " (excepted: " << exceptedValue << ")" << std::endl;
+      }
+    }
+    else{
+      if(v == exceptedValue){
+        std::cerr << "ng: " << v << " (same value)" << std::endl;
+      }
+      else{
+        std::cerr << "ok: " << v << " (excepted: " << exceptedValue << ")" << std::endl;
+      }
+    }
   }
   catch(std::exception* e){
-    std::cerr << e->what() << std::endl;
+    if(exceptedCompareResult == compare::same){
+      std::cerr << "ng: " << e->what() << std::endl;
+    }
+    else{
+      std::cout << "ok: " << e->what() << std::endl;
+    }
   }
 }
 
-template <typename T> void printValue(const json* j) {
+template <typename JSON_VALUE_TYPE, typename EXCEPTED_VALUE_TYPE> void valueValidation(const json* j, const EXCEPTED_VALUE_TYPE& exceptedValue, const compare exceptedCompareResult) {
   if(j == nullptr) {
-    std::cerr << "json* == nullptr" << std::endl;
+    if(exceptedCompareResult == compare::same){
+      std::cerr << "ng: " << "json* == nullptr (excepted: " << exceptedValue << ")" << std::endl;
+    }
+    else{
+      std::cout << "ok: " << "json* == nullptr (excepted: " << exceptedValue << ")" << std::endl;
+    }
   }
   else{
-    printValue<T>(*j);
+    valueValidation<JSON_VALUE_TYPE>(*j, exceptedValue, exceptedCompareResult);
   }
 }
 
@@ -82,33 +110,34 @@ void test_005() {
   j.set("aaa");
 
   j.set(12LL);
-  printValue<int>(j);
-  printValue<double>(j);
+  valueValidation<int64_t>(j, 12LL, compare::same);
+  valueValidation<int>(j, 12, compare::same);
+  valueValidation<double>(j, 12.0, compare::same);
   
   j.set(12);
   j.set(12.5);
   j.set(12.5f);
-  printValue<int>(j);
-  printValue<double>(j);
-  printValue<std::string>(j);
+  valueValidation<int>(j, 12, compare::same);
+  valueValidation<float>(j, 12.5, compare::same);
+  valueValidation<std::string>(j, "12.5", compare::different);
 
   j.set("abc");
-  printValue<std::string>(j);
-  printValue<int>(j); /* error */
+  valueValidation<std::string>(j, "abc", compare::same);
+  valueValidation<uint16_t>(j, 0xabc, compare::different);
 
   j.set(true);
-  printValue<bool>(j);
-  printValue<int>(j); /* error */
+  valueValidation<bool>(j, true, compare::same);
+  valueValidation<int>(j, 1, compare::different);
 }
 
 void test_006() {
   {
     json x({1, 2, 3});
-    printValue<int>(x.get<json::array_type>()[2]);
+    valueValidation<int>(x.get<json::array_type>()[2], 3, compare::same);
   }
   {
     json x({ "a", "b", "c"});
-    printValue<std::string>(x.get<json::array_type>()[1]);
+    valueValidation<std::string>(x.get<json::array_type>()[1], "b", compare::same);
   }
 
   {
@@ -116,8 +145,8 @@ void test_006() {
       {"abc", 1},
       {"aaa", "aaa"}
     });
-    printValue<int>(path_util::find(x, "abc"));
-    printValue<std::string>(path_util::find(x, "aaa"));
+    valueValidation<int>(path_util::find(x, "abc"), 1, compare::same);
+    valueValidation<std::string>(path_util::find(x, "aaa"), "aaa", compare::same);
   }
   {
     json x = {
@@ -130,8 +159,8 @@ void test_006() {
         {"2", "2.0"}
       }}
     };
-    printValue<double>(path_util::find(x, "ccc")->get<json::array_type>()[1]);
-    printValue<int>(path_util::find(x, "ddd")->get<json::array_type>()[1]);
+    valueValidation<double>(path_util::find(x, "ccc")->get<json::array_type>()[1], 1.234, compare::same);
+    valueValidation<int>(path_util::find(x, "ddd")->get<json::array_type>()[1], 2, compare::same);
   }
   {
     json y = {1, "abc", true};
@@ -161,20 +190,20 @@ void test_007() {
     }
   )");
   auto jj = deserializer(ss).execute();
-  printValue<int>(path_util::find(jj, "user_id"));
+  valueValidation<int>(path_util::find(jj, "user_id"), 123, compare::same);
 
-  printValue<int>(path_util::find(jj, "obj.value1"));
+  valueValidation<int>(path_util::find(jj, "obj.value1"), 1, compare::same);
 
   auto value3 = path_util::find(jj, "obj.value3");  /** u03A9 -> 0xCE, 0xA9 */
   auto value3_arr = value3->get<json::array_type>();
-  printValue<int>(value3_arr[0]);
-  printValue<std::string>(value3_arr[2]);  
+  valueValidation<int>(value3_arr[0], 1, compare::same);
+  valueValidation<std::string>(value3_arr[2], "ABC\nΩDEF", compare::same);  
 }
 
 void test_008() {
   json j;
   j["abc"]["def"] = 123456;
-  printValue<int>(path_util::find(j, "abc.def"));
+  valueValidation<int>(path_util::find(j, "abc.def"), 123456, compare::same);
 
   bool b = j[std::string("ddd")].is_undefined();
   std::cout << b << std::endl;
@@ -184,8 +213,8 @@ void test_008() {
 void test_009() {
   json j;
   j[1][0] = 555;
-  printValue<int>(j[1][0]);
-  printValue<nullptr_t>(j[0]);
+  valueValidation<int>(j[1][0], 555, compare::same);
+  valueValidation<int>(j[0], 0, compare::different);
 
   const auto& jj = j;
 
@@ -204,9 +233,9 @@ void test_010() {
     }}
   };
   path_util::put(j, "b.b2", "_b2");
-  printValue<std::string>(path_util::find(j, "a"));
-  printValue<std::string>(path_util::find(j, "b.b1"));
-  printValue<std::string>(path_util::find(j, "b.b2"));
+  valueValidation<std::string>(path_util::find(j, "a"), "_a", compare::same);
+  valueValidation<std::string>(path_util::find(j, "b.b1"), "_b1", compare::same);
+  valueValidation<std::string>(path_util::find(j, "b.b2"), "_b2", compare::same);
 }
 
 
@@ -220,21 +249,21 @@ void test_011() {
   json jj = j.clone();
 
   path_util::put(j, "b.b2", "_b2");
-  printValue<std::string>(path_util::find(j, "a"));
-  printValue<std::string>(path_util::find(j, "b.b1"));
-  printValue<std::string>(path_util::find(j, "b.b2"));
+  valueValidation<std::string>(path_util::find(j, "a"), "_a", compare::same);
+  valueValidation<std::string>(path_util::find(j, "b.b1"), "_b1", compare::same);
+  valueValidation<std::string>(path_util::find(j, "b.b2"), "_b2", compare::same);
 
-  printValue<std::string>(path_util::find(jj, "a"));
-  printValue<std::string>(path_util::find(jj, "b.b1"));
-  printValue<std::string>(path_util::find(jj, "b.b2")); /** nullptr */
+  valueValidation<std::string>(path_util::find(jj, "a"), "_a", compare::same);
+  valueValidation<std::string>(path_util::find(jj, "b.b1"), "_b1", compare::same);
+  valueValidation<std::string>(path_util::find(jj, "b.b2"), "_b2", compare::different);
 }
 
 void test_012() {
   const std::string s = "123";
   auto j = json(s);       /** コピーコンストラクタ */
-  printValue<std::string>(j);
+  valueValidation<std::string>(j, "123", compare::same);
   auto jj = json(std::string("abc")); /** 右辺値コンストラクタ */
-  printValue<std::string>(jj);
+  valueValidation<std::string>(jj, "abc", compare::same);
 }
 
 void test_013() {
@@ -306,6 +335,16 @@ void test_015() {
   std::cout << serializer(j).execute() << std::endl;
 }
 
+void test_016() {
+  std::map<std::string,int> im({
+    {"abc", 1},
+    {"def", 2}
+  });
+  json::sp j = object_util::to_json(im.begin(), im.end()).to_shared();
+  valueValidation<int>((*j)["abc"], 1, compare::same);
+}
+
+
 
 int main(void) {
 
@@ -353,6 +392,9 @@ int main(void) {
 
   std::cout << "********** test_015() **********" << std::endl;
   test_015();
+
+  std::cout << "********** test_016() **********" << std::endl;
+  test_016();
 
   return 0;
 }
