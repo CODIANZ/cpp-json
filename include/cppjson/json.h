@@ -111,8 +111,7 @@ private:
   template <
     typename T,
     std::enable_if_t<
-      is_integer_compatible<T>::value ||
-      is_floating_point_compatible<T>::value ||
+      is_number_type<T>::value ||
       value_type_traits<T>::available ||
       std::is_same<T, const char*>::value
       , bool
