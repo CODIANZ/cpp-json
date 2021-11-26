@@ -1,4 +1,4 @@
-#include "cppjson/cppjson.h"
+#include <cppjson/cppjson.h>
 #include <iostream>
 #include <map>
 #include <list>
@@ -7,7 +7,8 @@ using namespace cppjson;
 
 enum class compare { same, different };
 
-template<typename JSON_VALUE_TYPE, typename EXCEPTED_VALUE_TYPE> void valueValidation(const json& j, const EXCEPTED_VALUE_TYPE& exceptedValue, const compare exceptedCompareResult) {
+template<typename JSON_VALUE_TYPE, typename EXCEPTED_VALUE_TYPE>
+void valueValidation(const json& j, const EXCEPTED_VALUE_TYPE& exceptedValue, const compare exceptedCompareResult) {
   try{
     const auto& v = j.get<JSON_VALUE_TYPE>();
     if(exceptedCompareResult == compare::same){
@@ -37,7 +38,8 @@ template<typename JSON_VALUE_TYPE, typename EXCEPTED_VALUE_TYPE> void valueValid
   }
 }
 
-template <typename JSON_VALUE_TYPE, typename EXCEPTED_VALUE_TYPE> void valueValidation(const json* j, const EXCEPTED_VALUE_TYPE& exceptedValue, const compare exceptedCompareResult) {
+template <typename JSON_VALUE_TYPE, typename EXCEPTED_VALUE_TYPE>
+void valueValidation(const json* j, const EXCEPTED_VALUE_TYPE& exceptedValue, const compare exceptedCompareResult) {
   if(j == nullptr) {
     if(exceptedCompareResult == compare::same){
       std::cerr << "ng: " << "json* == nullptr (excepted: " << exceptedValue << ")" << std::endl;
