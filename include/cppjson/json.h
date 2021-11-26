@@ -46,12 +46,12 @@ private:
     static constexpr bool value = std::is_integral<T>::value && (!std::is_same<T, bool>::value);
   };
 
-  /** double に変換可能か判定する（doubleは除外） */
+  /** double に変換可能か判定する */
   template <typename T> struct is_floating_point_compatible {
     static constexpr bool value = std::is_floating_point<T>::value;
   };
 
-  /** Number型（integer or floating point）を判定判定 */
+  /** Number型（integer or floating point）か判定する */
   template <typename T> struct is_number_type {
     static constexpr bool value = is_integer_compatible<T>::value || is_floating_point_compatible<T>::value;
   };
@@ -260,6 +260,7 @@ public:
   bool is_null() const              { return value_type() == value_type::null; }
   bool is_null_or_undefined() const { return is_undefined() || is_null(); }
 
+  /* 値が存在するのか判定 */
   operator bool() const { return is_null_or_undefined(); }
 
   /** T で取得可能か判定する */
