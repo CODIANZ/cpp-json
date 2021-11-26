@@ -112,6 +112,10 @@ void test_004() {
   a = std::move(b);
   valueValidation<std::string>(a, "abc", compare::same);
   valueValidation<std::string>(b, "abc", compare::different); /** b = undefined */
+
+  auto s = a.release<std::string>();
+  assert(s == "abc");
+  valueValidation<std::string>(a, "abc", compare::different); /** a = undefined */
 }
 
 /** get */
