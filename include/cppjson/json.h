@@ -12,9 +12,12 @@
 namespace cppjson {
 class json
 {
-public:
-  /* js独自の型 */
+private:
+  /* js独自の型（非公開） */
   struct undefined_type {};
+
+public:
+  /* js独自の型（公開） */
   using array_type = std::vector<json>;
   using object_type = std::unordered_map<std::string, json>;
 
@@ -131,6 +134,11 @@ private:
     throw new bad_cast(ss.str());
   }
   
+  /** const json& で undefined を返却する場合のインスタンス保有をする */
+  static const json& undefined() {
+    static const json undefined_const;
+    return undefined_const;
+  }
 
 protected:
 
@@ -255,11 +263,10 @@ public:
 
   /** const では見つからない場合、 undefined を返却する */
   const json& operator [](const char * key) const {
-    static const json undefined;
-    if(value_type() != value_type::object) return undefined;
+    if(value_type() != value_type::object) return undefined();
     auto&& obj = get<object_type>();
     auto it = obj.find(key);
-    return it != obj.end() ? it->second : undefined;
+    return it != obj.end() ? it->second : undefined();
   }
 
   const json& operator [](const std::string& key) const {
@@ -286,10 +293,9 @@ public:
 
   /** const では見つからない場合、 undefined を返却する */
   const json& operator [](int index) const {
-    static const json undefined;
-    if(value_type() != value_type::array) return undefined;
+    if(value_type() != value_type::array) return undefined();
     auto&& arr = get<array_type>();
-    return (index < arr.size()) ? arr[index] : undefined;
+    return (index < arr.size()) ? arr[index] : undefined();
   }
 
   /** 非const では見つからない場合、 欠番を nullptr で埋める */
