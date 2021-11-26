@@ -61,6 +61,13 @@
     "unordered_map": "cpp",
     "utility": "cpp",
     "vector": "cpp",
-    "__memory": "cpp"
-  }
+    "__memory": "cpp",
+    "__tree": "cpp",
+    "map": "cpp",
+    "list": "cpp",
+    "memory_resource": "cpp",
+    "__functional_03": "cpp",
+    "iomanip": "cpp"
+  },
+  "C_Cpp.errorSquiggles": "Disabled"
 }

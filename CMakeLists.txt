@@ -4,7 +4,9 @@ project(json VERSION 0.1.0)
 include(CTest)
 enable_testing()
 
-add_executable(json main.cpp)
+include_directories(include)
+
+add_executable(json test/main.cpp)
 
 set(CMAKE_CXX_FLAGS "-std=c++14")
 set(CPACK_PROJECT_NAME ${PROJECT_NAME})
