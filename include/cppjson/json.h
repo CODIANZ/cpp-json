@@ -246,11 +246,14 @@ public:
     return j;
   }
 
-  /** 保持している値を開放し、開放された値を返却する。 json は undefined となる */
+  /** 保持している値を開放し、開放された値を返却する。 json は undefined となる。 */
   template <typename T, std::enable_if_t<value_type_traits<T>::available, bool> = true>
-  void release(std::unique_ptr<T>& value) {
-    value.reset(m_value.release());
+  T release() {
+    auto avalue = dynamic_cast<value_container<T>*>(m_value.get());
+    if(avalue == nullptr) throw_bad_cast<T>(m_value->value_type_string());
+    auto x = std::move(avalue->value);
     m_value.reset(new value_container<undefined_type>({})); /** 破棄される側のケア */
+    return x;
   }
 
 
