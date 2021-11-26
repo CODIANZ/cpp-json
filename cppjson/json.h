@@ -33,6 +33,10 @@ public:
   template<> struct value_type_traits<undefined_type> { static constexpr bool available = true; static constexpr const char* const name = "undefined" ; static constexpr value_type type = value_type::undefined; };
   template<typename T> struct value_type_traits       { static constexpr bool available = false; };
 
+  /** shared pointer 化 */
+  using sp = std::shared_ptr<json>;
+  sp to_shared() { return std::make_shared<json>(std::move(*this)); }
+
 private:
   /** int64_t に変換可能か判定する（int64_tとboolは除外） */
   template <typename T> struct is_integer_compatible {
