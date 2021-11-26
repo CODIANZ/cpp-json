@@ -12,9 +12,12 @@
 namespace cppjson {
 class json
 {
-public:
-  /* js独自の型 */
+private:
+  /* js独自の型（非公開） */
   struct undefined_type {};
+
+public:
+  /* js独自の型（公開） */
   using array_type = std::vector<json>;
   using object_type = std::unordered_map<std::string, json>;
 
@@ -43,12 +46,12 @@ private:
     static constexpr bool value = std::is_integral<T>::value && (!std::is_same<T, bool>::value);
   };
 
-  /** double に変換可能か判定する（doubleは除外） */
+  /** double に変換可能か判定する */
   template <typename T> struct is_floating_point_compatible {
     static constexpr bool value = std::is_floating_point<T>::value;
   };
 
-  /** Number型（integer or floating point）を判定判定 */
+  /** Number型（integer or floating point）か判定する */
   template <typename T> struct is_number_type {
     static constexpr bool value = is_integer_compatible<T>::value || is_floating_point_compatible<T>::value;
   };
@@ -84,6 +87,7 @@ private:
     }
   };
 
+  /** json で保持する唯一の値 */
   std::unique_ptr<value_container_base> m_value;
 
   /** 整数型、浮動小数点の相互型変換を考慮した値取得 */
@@ -107,8 +111,7 @@ private:
   template <
     typename T,
     std::enable_if_t<
-      is_integer_compatible<T>::value ||
-      is_floating_point_compatible<T>::value ||
+      is_number_type<T>::value ||
       value_type_traits<T>::available ||
       std::is_same<T, const char*>::value
       , bool
@@ -131,14 +134,24 @@ private:
     throw new bad_cast(ss.str());
   }
   
+  /** const json& で undefined を返却する場合のインスタンス保有をする */
+  static const json& undefined() {
+    static const json undefined_const;
+    return undefined_const;
+  }
 
 protected:
 
 
 public:
+  /************** インスタンス生成・破棄 ***************/
+
+  /** デフォルト・コピー・ムーブ */
   json() : m_value(new value_container<undefined_type>({})) {}
   json(const json& s) : m_value(s.m_value->clone()) {}
-  json(json&& s) : m_value(s.m_value.release()) {}
+  json(json&& s) : m_value(s.m_value.release()) {
+    s.m_value.reset(new value_container<undefined_type>({})); /** 破棄される側のケア */
+  }
 
   /** 整数型（内部では int64_t） */
   template <typename T, std::enable_if_t<is_integer_compatible<T>::value, bool> = true>
@@ -179,17 +192,20 @@ public:
     pushValues(arr, std::forward<ARGS>(args)...);
   }
 
+  /** デストラクタ */
   ~json() = default;
 
 
   /************** 設定（関数） ***************/
   void set(const json& j) { m_value.reset(j.m_value->clone()); }
-  void set(json&& j) { m_value.reset(j.m_value.release()); }
-
+  void set(json&& j) {
+    m_value.reset(j.m_value.release());
+    j.m_value.reset(new value_container<undefined_type>({})); /** 破棄される側のケア */
+  }
 
   /************** 設定（代入） ***************/
   json& operator =(const json& j) { set(j); return *this; }
-  json& operator =(json&& j) { set(j); return *this; }
+  json& operator =(json&& j) { set(std::move(j)); return *this; }
 
 
   /************** 取得 ***************/
@@ -230,11 +246,14 @@ public:
     return j;
   }
 
-  /** 保持している値を開放し、開放された値を返却する。 json は undefined となる */
+  /** 保持している値を開放し、開放された値を返却する。 json は undefined となる。 */
   template <typename T, std::enable_if_t<value_type_traits<T>::available, bool> = true>
-  void release(std::unique_ptr<T>& value) {
-    value.reset(m_value.release());
-    m_value.reset(new value_container<undefined_type>({}));
+  T release() {
+    auto avalue = dynamic_cast<value_container<T>*>(m_value.get());
+    if(avalue == nullptr) throw_bad_cast<T>(m_value->value_type_string());
+    auto x = std::move(avalue->value);
+    m_value.reset(new value_container<undefined_type>({})); /** 破棄される側のケア */
+    return x;
   }
 
 
@@ -247,7 +266,22 @@ public:
   bool is_null() const              { return value_type() == value_type::null; }
   bool is_null_or_undefined() const { return is_undefined() || is_null(); }
 
+  /* 値が存在するのか判定 */
   operator bool() const { return is_null_or_undefined(); }
+
+  /** T で取得可能か判定する */
+  template<typename T> bool acquirable() const {
+    if(is_number_type<T>::value){
+      auto&& self_type = value_type();
+      return self_type == value_type::integral || self_type == value_type::floating_point;
+    }
+    else if(value_type_traits<T>::available){
+      return dynamic_cast<value_container<T>*>(m_value.get()) != nullptr;
+    }
+    else {
+      return false;
+    }
+  }
 
 
   /************** operator [] ***************/
@@ -255,11 +289,10 @@ public:
 
   /** const では見つからない場合、 undefined を返却する */
   const json& operator [](const char * key) const {
-    static const json undefined;
-    if(value_type() != value_type::object) return undefined;
+    if(value_type() != value_type::object) return undefined();
     auto&& obj = get<object_type>();
     auto it = obj.find(key);
-    return it != obj.end() ? it->second : undefined;
+    return it != obj.end() ? it->second : undefined();
   }
 
   const json& operator [](const std::string& key) const {
@@ -286,10 +319,9 @@ public:
 
   /** const では見つからない場合、 undefined を返却する */
   const json& operator [](int index) const {
-    static const json undefined;
-    if(value_type() != value_type::array) return undefined;
+    if(value_type() != value_type::array) return undefined();
     auto&& arr = get<array_type>();
-    return (index < arr.size()) ? arr[index] : undefined;
+    return (index < arr.size()) ? arr[index] : undefined();
   }
 
   /** 非const では見つからない場合、 欠番を nullptr で埋める */
