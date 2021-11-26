@@ -161,6 +161,46 @@ x.get<float>();   /* ok */
 
 ただし、内部では `static_cast<>` で変換され、場合によっては、丸め込みが発生するので注意が必要です。
 
+## 注意事項
+
+### array 内の array や object がネストする場合の初期化
+
+array内に array や object がネストする場合、array の初期化は、initalizer_list　ではなく可変引数テンプレートが採用されるため、入れ子になった array や object は json を明示する必要がある。
+
+```cpp
+json j = {
+  json{ 1, true },
+  3,
+  json{
+    {"key1", "value1"},
+    {"key2", "value2"}
+  }
+};
+```
+
+object内の array や object のネストは問題ない。
+
+```cpp
+json j = {
+  {"key1", "value1"},
+  {"key2", {"value2-1", 123}},
+  {"key3", {
+    {"value3-1", 1},
+    {"value3-2", false}
+  }}
+};
+```
+
+この点につき、改善しようか悩んだが、下記のようなケースを考えると、これが object なのか、文字列の２次元配列なのか判別しようがなく、最終的にはコンパイル時に ambiguous だと怒られるのオチなので、この仕様のままとする。
+
+```cpp
+json j = {
+  {"1", "2"},
+  {"3", "4"}
+};
+```
+
+
 
 ## ライセンス
 
