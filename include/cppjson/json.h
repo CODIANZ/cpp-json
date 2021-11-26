@@ -87,6 +87,7 @@ private:
     }
   };
 
+  /** json で保持する唯一の値 */
   std::unique_ptr<value_container_base> m_value;
 
   /** 整数型、浮動小数点の相互型変換を考慮した値取得 */
@@ -144,6 +145,9 @@ protected:
 
 
 public:
+  /************** インスタンス生成・破棄 ***************/
+
+  /** デフォルト・コピー・ムーブ */
   json() : m_value(new value_container<undefined_type>({})) {}
   json(const json& s) : m_value(s.m_value->clone()) {}
   json(json&& s) : m_value(s.m_value.release()) {}
@@ -187,6 +191,7 @@ public:
     pushValues(arr, std::forward<ARGS>(args)...);
   }
 
+  /** デストラクタ */
   ~json() = default;
 
 
