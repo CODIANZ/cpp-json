@@ -38,14 +38,19 @@ public:
   sp to_shared() { return std::make_shared<json>(std::move(*this)); }
 
 private:
-  /** int64_t に変換可能か判定する（int64_tとboolは除外） */
+  /** int64_t に変換可能か判定する */
   template <typename T> struct is_integer_compatible {
-    static constexpr bool value = std::is_integral<T>::value && (!std::is_same<T, bool>::value) && (!std::is_same<T, int64_t>::value);
+    static constexpr bool value = std::is_integral<T>::value && (!std::is_same<T, bool>::value);
   };
 
   /** double に変換可能か判定する（doubleは除外） */
   template <typename T> struct is_floating_point_compatible {
-    static constexpr bool value = std::is_floating_point<T>::value && (!std::is_same<T, double>::value);
+    static constexpr bool value = std::is_floating_point<T>::value;
+  };
+
+  /** Number型（integer or floating point）を判定判定 */
+  template <typename T> struct is_number_type {
+    static constexpr bool value = is_integer_compatible<T>::value || is_floating_point_compatible<T>::value;
   };
 
   /** value_container の基底クラス */
@@ -144,11 +149,15 @@ public:
   json(const T& v) { m_value.reset(new value_container<double>(static_cast<double>(v))); }
 
   /** その他の許容可能な型 */
-  template <typename T, std::enable_if_t<value_type_traits<T>::available, bool> = true>
+  template <typename T, std::enable_if_t<
+    value_type_traits<T>::available && (!is_number_type<T>::value)
+  , bool> = true>
   json(const T& v) { m_value.reset(new value_container<T>(v)); }
 
   /** その他の許容可能な型（右辺値） */
-  template <typename T, std::enable_if_t<value_type_traits<T>::available, bool> = true>
+  template <typename T, std::enable_if_t<
+    value_type_traits<T>::available && (!is_number_type<T>::value)
+  , bool> = true>
   json(T&& v) { m_value.reset(new value_container<T>(std::move(v))); }
 
   /** C文字列を受け入れる（内部では std::string） */
@@ -195,14 +204,18 @@ public:
     return getNumberValue<T>();
   }
   /** その他の許容可能な型（const） */
-  template <typename T, std::enable_if_t<value_type_traits<T>::available, bool> = true>
+  template <typename T, std::enable_if_t<
+    value_type_traits<T>::available && (!is_number_type<T>::value)
+  , bool> = true>
   const T& get() const {
     auto avalue = dynamic_cast<value_container<T>*>(m_value.get());
     if(avalue == nullptr) throw_bad_cast<T>(m_value->value_type_string());
     return avalue->value;
   }
   /** その他の許容可能な型（非const） */
-  template <typename T, std::enable_if_t<value_type_traits<T>::available, bool> = true>
+  template <typename T, std::enable_if_t<
+    value_type_traits<T>::available && (!is_number_type<T>::value)
+  , bool> = true>
   T& get() {
     auto avalue = dynamic_cast<value_container<T>*>(m_value.get());
     if(avalue == nullptr) throw_bad_cast<T>(m_value->value_type_string());
