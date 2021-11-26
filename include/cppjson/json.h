@@ -166,7 +166,10 @@ public:
   template <typename T, std::enable_if_t<
     value_type_traits<T>::available && (!is_number_type<T>::value)
   , bool> = true>
-  json(T v) { m_value.reset(new value_container<T>(std::forward<T>(v))); }
+  json(T v) {
+    /** T が参照型や右辺値である場合を考慮して、value_containerの型は参照を外す。（値については型を転送してmoveを促す） */
+    m_value.reset(new value_container<typename std::remove_reference<T>::type>(std::forward<T>(v)));
+  }
 
   /** C文字列を受け入れる（内部では std::string） */
   json(const char* v) { m_value.reset(new value_container<std::string>(v)); }
