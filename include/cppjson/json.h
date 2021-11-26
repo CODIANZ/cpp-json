@@ -149,7 +149,9 @@ public:
   /** デフォルト・コピー・ムーブ */
   json() : m_value(new value_container<undefined_type>({})) {}
   json(const json& s) : m_value(s.m_value->clone()) {}
-  json(json&& s) : m_value(s.m_value.release()) {}
+  json(json&& s) : m_value(s.m_value.release()) {
+    s.m_value.reset(new value_container<undefined_type>({})); /** 破棄される側のケア */
+  }
 
   /** 整数型（内部では int64_t） */
   template <typename T, std::enable_if_t<is_integer_compatible<T>::value, bool> = true>
@@ -196,12 +198,14 @@ public:
 
   /************** 設定（関数） ***************/
   void set(const json& j) { m_value.reset(j.m_value->clone()); }
-  void set(json&& j) { m_value.reset(j.m_value.release()); }
-
+  void set(json&& j) {
+    m_value.reset(j.m_value.release());
+    j.m_value.reset(new value_container<undefined_type>({})); /** 破棄される側のケア */
+  }
 
   /************** 設定（代入） ***************/
   json& operator =(const json& j) { set(j); return *this; }
-  json& operator =(json&& j) { set(j); return *this; }
+  json& operator =(json&& j) { set(std::move(j)); return *this; }
 
 
   /************** 取得 ***************/
@@ -246,7 +250,7 @@ public:
   template <typename T, std::enable_if_t<value_type_traits<T>::available, bool> = true>
   void release(std::unique_ptr<T>& value) {
     value.reset(m_value.release());
-    m_value.reset(new value_container<undefined_type>({}));
+    m_value.reset(new value_container<undefined_type>({})); /** 破棄される側のケア */
   }
 
 

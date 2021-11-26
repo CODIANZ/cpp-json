@@ -102,12 +102,16 @@ void test_003() {
   a.set("c-string");
 }
 
-/** json = json */
+/** copy & move */
 void test_004() {
   json a, b;
   a = "abc";
-  b = a;
+  b = a; /* copy */
+  valueValidation<std::string>(a, "abc", compare::same);
+  valueValidation<std::string>(b, "abc", compare::same);
   a = std::move(b);
+  valueValidation<std::string>(a, "abc", compare::same);
+  valueValidation<std::string>(b, "abc", compare::different); /** b = undefined */
 }
 
 /** get */
