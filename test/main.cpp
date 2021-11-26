@@ -17,20 +17,23 @@ void valueValidation(const json& j, const EXCEPTED_VALUE_TYPE& exceptedValue, co
       }
       else{
         std::cerr << "ng: " << v << " (excepted: " << exceptedValue << ")" << std::endl;
+        assert(false);
       }
     }
     else{
       if(v == exceptedValue){
         std::cerr << "ng: " << v << " (same value)" << std::endl;
+        assert(false);
       }
       else{
-        std::cerr << "ok: " << v << " (excepted: " << exceptedValue << ")" << std::endl;
+        std::cout << "ok: " << v << " (excepted: " << exceptedValue << ")" << std::endl;
       }
     }
   }
   catch(std::exception* e){
     if(exceptedCompareResult == compare::same){
       std::cerr << "ng: " << e->what() << std::endl;
+      assert(false);
     }
     else{
       std::cout << "ok: " << e->what() << std::endl;
@@ -43,6 +46,7 @@ void valueValidation(const json* j, const EXCEPTED_VALUE_TYPE& exceptedValue, co
   if(j == nullptr) {
     if(exceptedCompareResult == compare::same){
       std::cerr << "ng: " << "json* == nullptr (excepted: " << exceptedValue << ")" << std::endl;
+      assert(false);
     }
     else{
       std::cout << "ok: " << "json* == nullptr (excepted: " << exceptedValue << ")" << std::endl;
@@ -209,6 +213,7 @@ void test_008() {
 
   bool b = j[std::string("ddd")].is_undefined();
   std::cout << b << std::endl;
+  assert(b == true);
 }
 
 
@@ -222,9 +227,11 @@ void test_009() {
 
   const auto bb = jj[50];
   std::cout << bb.is_null_or_undefined() << std::endl;
+  assert(bb.is_null_or_undefined() == true);
 
   const bool b = j[50].is_undefined();
   std::cout << b << std::endl;
+  assert(b == false); /* j[50] == nullptr */
 }
 
 void test_010() {
@@ -346,6 +353,16 @@ void test_016() {
   valueValidation<int>((*j)["abc"], 1, compare::same);
 }
 
+void test_017() {
+  json j(10);
+  assert(j.acquirable<int>() == true);
+  assert(j.acquirable<bool>() == false);
+  assert(j.acquirable<std::string>() == false);
+  j = "abc";
+  assert(j.acquirable<int>() == false);
+  assert(j.acquirable<bool>() == false);
+  assert(j.acquirable<std::string>() == true);
+}
 
 
 int main(void) {
@@ -397,6 +414,9 @@ int main(void) {
 
   std::cout << "********** test_016() **********" << std::endl;
   test_016();
+
+  std::cout << "********** test_017() **********" << std::endl;
+  test_017();
 
   return 0;
 }

@@ -262,6 +262,20 @@ public:
 
   operator bool() const { return is_null_or_undefined(); }
 
+  /** T で取得可能か判定する */
+  template<typename T> bool acquirable() const {
+    if(is_number_type<T>::value){
+      auto&& self_type = value_type();
+      return self_type == value_type::integral || self_type == value_type::floating_point;
+    }
+    else if(value_type_traits<T>::available){
+      return dynamic_cast<value_container<T>*>(m_value.get()) != nullptr;
+    }
+    else {
+      return false;
+    }
+  }
+
 
   /************** operator [] ***************/
   /** object型に対する [] アクセス */
