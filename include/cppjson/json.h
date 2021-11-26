@@ -99,8 +99,8 @@ private:
   }
 
   /** json の配列による設定の継続処理 */
-  template <typename T, typename ...ARGS> void pushValues(array_type& arr, const T& v, ARGS ...args){
-    pushTypedValue(arr, v);
+  template <typename T, typename ...ARGS> void pushValues(array_type& arr, T v, ARGS ...args){
+    pushTypedValue(arr, std::forward<T>(v));
     pushValues(arr, std::forward<ARGS>(args)...);
   }
 
@@ -113,11 +113,12 @@ private:
     std::enable_if_t<
       is_number_type<T>::value ||
       value_type_traits<T>::available ||
-      std::is_same<T, const char*>::value
+      std::is_same<T, const char*>::value ||
+      std::is_same<T, json>::value
       , bool
     > = true
-  > void pushTypedValue(array_type& arr, const T& v) {
-    arr.push_back(v);
+  > void pushTypedValue(array_type& arr, T v) {
+    arr.push_back(std::forward<T>(v));
   }
 
   /** 型変換不能エラー */
@@ -165,13 +166,7 @@ public:
   template <typename T, std::enable_if_t<
     value_type_traits<T>::available && (!is_number_type<T>::value)
   , bool> = true>
-  json(const T& v) { m_value.reset(new value_container<T>(v)); }
-
-  /** その他の許容可能な型（右辺値） */
-  template <typename T, std::enable_if_t<
-    value_type_traits<T>::available && (!is_number_type<T>::value)
-  , bool> = true>
-  json(T&& v) { m_value.reset(new value_container<T>(std::move(v))); }
+  json(T v) { m_value.reset(new value_container<T>(std::forward<T>(v))); }
 
   /** C文字列を受け入れる（内部では std::string） */
   json(const char* v) { m_value.reset(new value_container<std::string>(v)); }

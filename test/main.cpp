@@ -372,6 +372,56 @@ void test_017() {
   assert(j.acquirable<std::string>() == true);
 }
 
+void test_018() {
+  /**
+   * array内に array や object がネストする場合、
+   * array の初期化は、initalizer_list　ではなく可変引数テンプレートが採用されるため、
+   * 入れ子になった array や object は json を明示する必要がある。
+   * 改善しようか悩んだが、下記のようなケースを考えると、これが object なのか、文字列の２次元配列なのか
+   * 判別しようがなく、おそらくコンパイラも ambiguous だと怒られるのオチなので、
+   * この仕様のままとする。
+   * {
+   *   {"key1", "value1"},
+   *   {"key2", "value2"}
+   * }
+   **/
+  json j = {
+    1,
+    json{ 2, 3 }
+  };
+  valueValidation<int>(j[0], 1, compare::same);
+  valueValidation<int>(j[1][0], 2, compare::same);
+  valueValidation<int>(j[1][1], 3, compare::same);
+  
+  j = {
+    json{ 1, true },
+    3,
+    json{
+      {"key1", "value1"},
+      {"key2", "value2"}
+    }
+  };
+  valueValidation<int>(j[0][0], 1, compare::same);
+  valueValidation<bool>(j[0][1], true, compare::same);
+  valueValidation<int>(j[1], 3, compare::same);
+  valueValidation<std::string>(j[2]["key1"], "value1", compare::same);
+  valueValidation<std::string>(j[2]["key2"], "value2", compare::same);
+
+  /** object内の array や object のネストは問題ない */
+  j = {
+    {"key1", "value1"},
+    {"key2", {"value2-1", 123}},
+    {"key3", {
+      {"value3-1", 1},
+      {"value3-2", false}
+    }}
+  };
+  valueValidation<std::string>( j["key1"], "value1", compare::same);
+  valueValidation<std::string>( j["key2"][0], "value2-1", compare::same);
+  valueValidation<int>(         j["key2"][1], 123, compare::same);
+  valueValidation<int>(         j["key3"]["value3-1"], 1, compare::same);
+  valueValidation<bool>(        j["key3"]["value3-2"], false, compare::same);
+}
 
 int main(void) {
 
@@ -425,6 +475,9 @@ int main(void) {
 
   std::cout << "********** test_017() **********" << std::endl;
   test_017();
+
+  std::cout << "********** test_018() **********" << std::endl;
+  test_018();
 
   return 0;
 }
