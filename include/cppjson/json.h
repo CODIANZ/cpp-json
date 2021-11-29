@@ -12,10 +12,6 @@
 namespace cppjson {
 class json
 {
-private:
-  /* js独自の型（非公開） */
-  struct undefined_type {};
-
 public:
   /* js独自の型（公開） */
   using array_type = std::vector<json>;
@@ -33,7 +29,6 @@ public:
   template<> struct value_type_traits<nullptr_t     > { static constexpr bool available = true; static constexpr const char* const name = "null"      ; static constexpr value_type type = value_type::null; };
   template<> struct value_type_traits<array_type    > { static constexpr bool available = true; static constexpr const char* const name = "array"     ; static constexpr value_type type = value_type::array; };
   template<> struct value_type_traits<object_type   > { static constexpr bool available = true; static constexpr const char* const name = "object"    ; static constexpr value_type type = value_type::object; };
-  template<> struct value_type_traits<undefined_type> { static constexpr bool available = true; static constexpr const char* const name = "undefined" ; static constexpr value_type type = value_type::undefined; };
   template<typename T> struct value_type_traits       { static constexpr bool available = false; };
 
   /** shared pointer 化 */
@@ -148,11 +143,9 @@ public:
   /************** インスタンス生成・破棄 ***************/
 
   /** デフォルト・コピー・ムーブ */
-  json() : m_value(new value_container<undefined_type>({})) {}
-  json(const json& s) : m_value(s.m_value->clone()) {}
-  json(json&& s) : m_value(s.m_value.release()) {
-    s.m_value.reset(new value_container<undefined_type>({})); /** 破棄される側のケア */
-  }
+  json() = default;
+  json(const json& s) : m_value(s.m_value ? s.m_value->clone() : nullptr) {}
+  json(json&& s) : m_value(s.m_value.release()) {}
 
   /** 整数型（内部では int64_t） */
   template <typename T, std::enable_if_t<is_integer_compatible<T>::value, bool> = true>
@@ -198,7 +191,6 @@ public:
   void set(const json& j) { m_value.reset(j.m_value->clone()); }
   void set(json&& j) {
     m_value.reset(j.m_value.release());
-    j.m_value.reset(new value_container<undefined_type>({})); /** 破棄される側のケア */
   }
 
   /************** 設定（代入） ***************/
@@ -210,11 +202,13 @@ public:
   /** 整数型（int_64tからの型変換を許容するため参照ではなく値のコピーを返却する点に注意） */
   template <typename T, std::enable_if_t<is_integer_compatible<T>::value, bool> = true>
   const T get() const {
+    if(m_value.get() == nullptr) value_is_undefined::throw_error();
     return getNumberValue<T>();
   }
   /** 浮動小数点型（doubleからの型変換を許容するため参照ではなく値のコピーを返却する点に注意） */
   template <typename T, std::enable_if_t<is_floating_point_compatible<T>::value, bool> = true>
   const T get() const {
+    if(m_value.get() == nullptr) value_is_undefined::throw_error();
     return getNumberValue<T>();
   }
   /** その他の許容可能な型（const） */
@@ -222,6 +216,7 @@ public:
     value_type_traits<T>::available && (!is_number_type<T>::value)
   , bool> = true>
   const T& get() const {
+    if(m_value.get() == nullptr) value_is_undefined::throw_error();
     auto avalue = dynamic_cast<value_container<T>*>(m_value.get());
     if(avalue == nullptr) throw_bad_cast<T>(m_value->value_type_string());
     return avalue->value;
@@ -231,6 +226,7 @@ public:
     value_type_traits<T>::available && (!is_number_type<T>::value)
   , bool> = true>
   T& get() {
+    if(m_value.get() == nullptr) value_is_undefined::throw_error();
     auto avalue = dynamic_cast<value_container<T>*>(m_value.get());
     if(avalue == nullptr) throw_bad_cast<T>(m_value->value_type_string());
     return avalue->value;
@@ -249,18 +245,16 @@ public:
   T release() {
     auto avalue = dynamic_cast<value_container<T>*>(m_value.get());
     if(avalue == nullptr) throw_bad_cast<T>(m_value->value_type_string());
-    auto x = std::move(avalue->value);
-    m_value.reset(new value_container<undefined_type>({})); /** 破棄される側のケア */
-    return x;
+    return std::move(avalue->value);
   }
 
 
   /************** 状態・属性 ***************/
   /** 値の型を取得 */
-  const value_type value_type() const { return m_value->value_type(); }
+  const value_type value_type() const { return m_value ? m_value->value_type() : value_type::undefined; }
 
   /* undefined, null 確認用関数 */
-  bool is_undefined() const         { return value_type() == value_type::undefined; }
+  bool is_undefined() const         { return m_value.get() == nullptr; }
   bool is_null() const              { return value_type() == value_type::null; }
   bool is_null_or_undefined() const { return is_undefined() || is_null(); }
 
@@ -305,7 +299,7 @@ public:
     auto&& obj = get<object_type>();
     auto it = obj.find(key);
     if(it != obj.end()) return it->second;
-    obj[key] = undefined_type{};
+    obj[key] = json();
     return obj[key];
   }
 

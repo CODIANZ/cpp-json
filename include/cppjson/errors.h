@@ -42,6 +42,16 @@ private:
   bad_json(const std::string& s) : error(s) {}
 };
 
+/* undefined に対して型指定の値取得を行おうとした */
+class value_is_undefined : public error {
+friend class json;
+private:
+  value_is_undefined() : error("value_is_undefined") {}
+  [[noreturn]] static void throw_error(){
+    throw new value_is_undefined();
+  }
+};
+
 
 } /** namespace cppjson */
 
