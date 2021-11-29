@@ -130,20 +130,25 @@ x["b"].get<bool>();
 
 ### json の内部で保持する型
 
-* std::string
-* bool
 * int64_t (*1)
 * double
-* undefined (*2)
+* bool
 * std::nullptr_t
-* std::vector<cppjson::json>
-* std::unordered<std::string, cppjson::json>
+* std::string*
+* std::vector<cppjson::json>*
+* std::unordered<std::string, cppjson::json>*
 
-これらの型が、型消去した状態で `std::unique_ptr<>` にて保持されている。
+これらの型を union で共有メモリ上にマッピングした状態で保持しています。
 
 (*1) ... 符号付整数、符号無整数は区別せず `int64_t` を採用しています。理由は符号である1ビットについて、数値範囲の云々言うのであれば、もはや多倍長演算が必要になるということじゃないかと思う次第です。
 
-(*2) ... `undefined` は json には存在しませんが、オプショナル的な用法を想定しています。なので、 シリアライズ時には `null` に変換されます。
+### undefined の取り扱い
+
+* `undefined` は未初期化を表現するものですが、この `undefined` という「モノ」代入することはできません。（boostで云うところの `boost::none` は存在しません） 
+* `is_undefined()` が `true` の場合には値を取り出すことはできません。
+* `undefined` が生成される（生成する）タイミングは下記の通りです。
+  * デフォルトコンストラクタ `cppjson::json()` を呼び出した場合。
+  * object型に対してキーを添字アクセスをした際に、該当のキーが存在しない場合の戻り値の中身。
 
 
 ### 数値の取り扱い

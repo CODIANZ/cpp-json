@@ -59,17 +59,17 @@ void valueValidation(const json* j, const EXCEPTED_VALUE_TYPE& exceptedValue, co
 
 /** constructor */
 void test_001() {
-  json a;
-  json b(std::string("abc"));
-  json c(true);
-  json d(nullptr);
-  json e({1, "abc", true});
-  json f({{"key1", "value1"}, {"key2", 1.23}});
-  json g(123456789ll);
-  json h(1.2345678);
-  json i(456);
-  json j(1.2345678f);
-  json k("c-string");
+  { json a; }
+  { json a(std::string("abc")); }
+  { json a(true); }
+  { json a(nullptr); }
+  { json a({1, "abc", true}); }
+  { json a({{"key1", "value1"}, {"key2", 1.23}}); }
+  { json a(123456789ll); }
+  { json a(1.2345678); }
+  { json a(456); }
+  { json a(1.2345678f); }
+  { json a("c-string"); }
 }
 
 /** operator = */
