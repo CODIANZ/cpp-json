@@ -134,13 +134,15 @@ x["b"].get<bool>();
 * double
 * bool
 * std::nullptr_t
-* std::string*
-* std::vector<cppjson::json>*
-* std::unordered<std::string, cppjson::json>*
+* std::string (*2)
+* std::vector\<cppjson::json\> (*2)
+* std::unordered\<std::string, cppjson::json\> (*2)
 
 これらの型を union で共有メモリ上にマッピングした状態で保持しています。
 
 (*1) ... 符号付整数、符号無整数は区別せず `int64_t` を採用しています。理由は符号である1ビットについて、数値範囲の云々言うのであれば、もはや多倍長演算が必要になるということじゃないかと思う次第です。
+
+(*2) ... ポインタにて保持。
 
 ### undefined の取り扱い
 
