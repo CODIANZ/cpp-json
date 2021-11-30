@@ -72,7 +72,6 @@ private:
     };
     content         m_content;
     value_type      m_value_type;
-    const char*     m_value_type_string;
 
     /** 内包する値の解放（classインスタンスは削除するが、それ以外は何もしない） */
     void destruct_value() {
@@ -84,19 +83,8 @@ private:
       }
     }
 
-    /**
-     * 型をundefinedにする。
-     * ここではclassインスタンスの削除は行わない点に注意。
-     **/
-    void reset_to_undefined(){
-      m_value_type        = value_type_traits<undefined_type>::type;
-      m_value_type_string = value_type_traits<undefined_type>::name;
-    }
-
   public:
-    value_container() {
-      reset_to_undefined();
-    }
+    value_container(): m_value_type(value_type::undefined) {}
 
     value_container(const value_container& src): m_value_type(value_type::undefined) {
       *this = src;
@@ -116,19 +104,21 @@ private:
     value_container& operator = (const value_container& src){
       destruct_value();
       auto clone = src.clone();     /** コピーを生成 */
-      m_content = clone.m_content;
+      m_content = clone.m_content;  /** clone からcontentの所有権移転 */
       m_value_type = clone.m_value_type;
-      m_value_type_string = clone.m_value_type_string;
-      clone.reset_to_undefined(); /** 複製した側（clone）でclassインスタンスが破棄されないよう reset しておく */
+      /**
+       * 複製したオブジェクト（clone）はconetntの所有権を失ったので、
+       * オブジェクトを undefined とし、この関数のスコープを抜ける際に delete されないようにする */
+      clone.m_value_type = value_type_traits<undefined_type>::type;
       return *this;
     }
 
     value_container& operator = (value_container&& src){
       destruct_value();
-      m_content = src.m_content;
+      m_content = src.m_content;    /** src からcontentの所有権移転 */
       m_value_type = src.m_value_type;
-      m_value_type_string = src.m_value_type_string;
-      src.reset_to_undefined(); /** src側でclassインスタンスが破棄されないよう reset しておく */
+      /** srcはcontentの所有権を失ったので undefined とし delete しないようにする */
+      src.m_value_type = value_type_traits<undefined_type>::type;
       return *this;
     }
 
@@ -146,7 +136,20 @@ private:
     }
 
     const value_type value_type() const { return m_value_type; }
-    const char* value_type_string() const { return m_value_type_string; }
+
+    /** debug での使用を想定 */
+    const char* value_type_string() const { 
+      switch(value_type()) {
+        case value_type::integral:        { return value_type_traits<int64_t>::name; }
+        case value_type::floating_point:  { return value_type_traits<double>::name; }
+        case value_type::boolean:         { return value_type_traits<bool>::name; }
+        case value_type::null:            { return value_type_traits<nullptr_t>::name; }
+        case value_type::string:          { return value_type_traits<std::string>::name; }
+        case value_type::array:           { return value_type_traits<array_type>::name; }
+        case value_type::object:          { return value_type_traits<object_type>::name; }
+        default: /** undefined */         { return value_type_traits<undefined_type>::name; }
+      }
+    }
 
     template <typename T, std::enable_if_t<value_type_traits<T>::available && !std::is_class<T>::value, bool> = true>
     const T& get() const { return *reinterpret_cast<const T*>(&m_content); }
@@ -163,10 +166,7 @@ private:
     template <typename T, std::enable_if_t<value_type_traits<T>::available && !std::is_class<T>::value, bool> = true>
     void set(T value) {
       destruct_value();
-      if(m_value_type != value_type_traits<T>::type){
-        m_value_type = value_type_traits<T>::type;
-        m_value_type_string = value_type_traits<T>::name;
-      }
+      m_value_type = value_type_traits<T>::type;
       using TT = typename std::remove_reference<T>::type;
       *reinterpret_cast<TT*>(&m_content) = TT(std::forward<T>(value));
     }
@@ -174,10 +174,7 @@ private:
     template <typename T, std::enable_if_t<value_type_traits<T>::available && std::is_class<T>::value, bool> = true>
     void set(T value) {
       destruct_value();
-      if(m_value_type != value_type_traits<T>::type){
-        m_value_type = value_type_traits<T>::type;
-        m_value_type_string = value_type_traits<T>::name;
-      }
+      m_value_type = value_type_traits<T>::type;
       using TT = typename std::remove_reference<T>::type;
       *reinterpret_cast<TT**>(&m_content) = new TT(std::forward<T>(value));
     }

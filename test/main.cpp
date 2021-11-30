@@ -107,6 +107,8 @@ void test_004() {
   json a, b;
   a = "abc";
   b = a; /* copy */
+  assert(a.get<std::string>().c_str() != b.get<std::string>().c_str());
+
   valueValidation<std::string>(a, "abc", compare::same);
   valueValidation<std::string>(b, "abc", compare::same);
   a = std::move(b);
@@ -116,6 +118,25 @@ void test_004() {
   auto s = a.release<std::string>();
   assert(s == "abc");
   valueValidation<std::string>(a, "abc", compare::different); /** a = undefined */
+
+  a = {
+    { "1", {
+      {"a", "abc"},
+      {"b", "bcd"}
+    }},
+    { "2", "234" }
+  };
+
+  const char* ptr = a["1"]["a"].get<std::string>().c_str();
+
+  b = std::move(a["1"]);
+  valueValidation<int>(a["1"], 0, compare::different); /** = undefined */
+  valueValidation<std::string>(b["a"], "abc", compare::same);
+  json::object_type m = b.release<json::object_type>();
+  valueValidation<std::string>(b["a"], "abc", compare::different); /** = undefined */
+  
+  const char* ptr2 = m["a"].get<std::string>().c_str();
+  assert(ptr == ptr2);
 }
 
 /** get */
