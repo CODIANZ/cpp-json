@@ -3,6 +3,8 @@
 
 #include "errors.h"
 #include "json.h"
+#include "object.h"
+#include "array.h"
 #include "deserializer.h"
 #include "serializer.h"
 #include "path_util.h"

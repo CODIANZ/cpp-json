@@ -35,11 +35,6 @@ public:
   template<> struct value_type_traits<undefined_type> { static constexpr bool available = false; static constexpr const char* const name = "undefined" ; static constexpr value_type type = value_type::undefined; };
   template<typename T> struct value_type_traits       { static constexpr bool available = false; };
 
-  /** shared pointer 化 */
-  using sp = std::shared_ptr<json>;
-  sp to_shared() { return std::make_shared<json>(std::move(*this)); }
-
-private:
   /** int64_t に変換可能か判定する */
   template <typename T> struct is_integer_compatible {
     static constexpr bool value = std::is_integral<T>::value && (!std::is_same<T, bool>::value);
@@ -55,6 +50,11 @@ private:
     static constexpr bool value = is_integer_compatible<T>::value || is_floating_point_compatible<T>::value;
   };
 
+  /** shared pointer 化 */
+  using sp = std::shared_ptr<json>;
+  sp to_shared() { return std::make_shared<json>(std::move(*this)); }
+
+private:
   /**
    * 値を保有するクラス
    * class インスタンスはポインタで保有、その他は実体を保有する。
@@ -95,7 +95,12 @@ private:
     }
 
     template <typename T, std::enable_if_t<value_type_traits<T>::available, bool> = true>
-    value_container(T value): m_value_type(value_type::undefined) {
+    value_container(const T& value): m_value_type(value_type::undefined) {
+      set(T(value));  /** 値をここでコピーしてから渡す */
+    }
+
+    template <typename T, std::enable_if_t<value_type_traits<T>::available, bool> = true>
+    value_container(T&& value): m_value_type(value_type::undefined) {
       set(std::forward<T>(value));
     }
 
@@ -164,19 +169,17 @@ private:
     T& get() { return **reinterpret_cast<T**>(&m_content); }
 
     template <typename T, std::enable_if_t<value_type_traits<T>::available && !std::is_class<T>::value, bool> = true>
-    void set(T value) {
+    void set(T&& value) {
       destruct_value();
       m_value_type = value_type_traits<T>::type;
-      using TT = typename std::remove_reference<T>::type;
-      *reinterpret_cast<TT*>(&m_content) = TT(std::forward<T>(value));
+      *reinterpret_cast<T*>(&m_content) = T(std::forward<T>(value));
     }
 
     template <typename T, std::enable_if_t<value_type_traits<T>::available && std::is_class<T>::value, bool> = true>
-    void set(T value) {
+    void set(T&& value) {
       destruct_value();
       m_value_type = value_type_traits<T>::type;
-      using TT = typename std::remove_reference<T>::type;
-      *reinterpret_cast<TT**>(&m_content) = new TT(std::forward<T>(value));
+      *reinterpret_cast<T**>(&m_content) = new T(std::forward<T>(value));
     }
   };
 
@@ -194,29 +197,6 @@ private:
     else{
       throw_bad_cast<T>(m_value.value_type_string());
     }
-  }
-
-  /** json の配列による設定の継続処理 */
-  template <typename T, typename ...ARGS> void pushValues(array_type& arr, T v, ARGS ...args){
-    pushTypedValue(arr, std::forward<T>(v));
-    pushValues(arr, std::forward<ARGS>(args)...);
-  }
-
-  /** json の配列による設定のゴール地点 */
-  void pushValues(array_type& arr) {};
-
-  /** 許容される型のみ arr に追加（追加できない型はコンパイルエラー） */
-  template <
-    typename T,
-    std::enable_if_t<
-      is_number_type<T>::value ||
-      value_type_traits<T>::available ||
-      std::is_same<T, const char*>::value ||
-      std::is_same<T, json>::value
-      , bool
-    > = true
-  > void pushTypedValue(array_type& arr, T v) {
-    arr.push_back(std::forward<T>(v));
   }
 
   /** 型変換不能エラー */
@@ -260,25 +240,23 @@ public:
 
   /** その他の許容可能な型 */
   template <typename T, std::enable_if_t<
-    value_type_traits<T>::available && (!is_number_type<T>::value)
+    value_type_traits<T>::available &&
+    (!is_number_type<T>::value)
   , bool> = true>
-  json(T v) : m_value(std::forward<T>(v)) {}
+  json(const T& v) : m_value(v) {}
+
+  /** その他の許容可能な型 */
+  template <typename T, std::enable_if_t<
+    value_type_traits<T>::available &&
+    (!is_number_type<T>::value)
+  , bool> = true>
+  json(T&& v) : m_value(std::forward<T>(v)) {}
 
   /** C文字列を受け入れる（内部では std::string） */
   json(const char* v) : m_value(std::string(v)) {}
 
   /** object型の initialize_list で構築*/
   json(std::initializer_list<object_type::value_type>&& list) : m_value(object_type(list)) {}
-
-  /**
-   * json の配列は許容可能な型が混在しているため、 initializer_list は使用せず可変引数テンプレートで再帰処理を行う。
-   * 可変引数テンプレートでは、各引数の型チェックが行えないため pushTypedValue() にて静的チェックを行う。
-   * （まぁ、この関数内で static_asster 使っても良いかもだけど）
-   **/
-  template <typename ...ARGS> json(ARGS ...args) : m_value(array_type()) {
-    auto& arr = get<array_type>();
-    pushValues(arr, std::forward<ARGS>(args)...);
-  }
 
   /** デストラクタ */
   ~json() = default;
