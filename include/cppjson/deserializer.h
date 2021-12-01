@@ -244,7 +244,7 @@ private:
         case mode::find_key_or_close: {
           if(c == '}'){
             m_stream.next(1);
-            j.set(obj);
+            j.set(std::move(obj));
             return;
           }  
           else if(is_blacket(c)) {
@@ -272,7 +272,7 @@ private:
         case mode::find_comma_or_close: {
           if(c == '}'){
             m_stream.next(1);
-            j.set(obj);
+            j.set(std::move(obj));
             return;
           }  
           else if(c == ',') {
@@ -298,7 +298,7 @@ private:
       const char c = m_stream[0];
       if(c == ']'){
         m_stream.next(1);
-        j.set(arr);
+        j.set(std::move(arr));
         return;
       }
       else if(c == ','){
