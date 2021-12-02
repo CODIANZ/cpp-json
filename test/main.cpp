@@ -330,21 +330,21 @@ void test_013() {
 
 void test_014() {
   std::vector<int> iv({1, 2, 3, 4});
-  json j = array_util::to_json(iv.begin(), iv.end());
+  json j = array::util::to_json(iv.begin(), iv.end());
   std::cout << serializer(j).execute() << std::endl;
 
   std::list<std::string> sv({"abc", "def", "ghi"});
-  j = array_util::to_json(sv);
+  j = array::util::to_json(sv);
   std::cout << serializer(j).execute() << std::endl;
 
-  j = array_util::create([](auto& arr){
+  j = array::util::create([](auto& arr){
     arr.push_back(true);
     arr.push_back(123);
     arr.push_back("baz");
   });
   std::cout << serializer(j).execute() << std::endl;
 
-  array_util::edit(j, [](auto& arr){
+  array::util::edit(j, [](auto& arr){
     arr.pop_back();
     arr.push_back({
       {"inner", 1}
@@ -358,24 +358,24 @@ void test_015() {
     {"abc", 1},
     {"def", 2}
   });
-  json j = object_util::to_json(im.begin(), im.end());
+  json j = object::util::to_json(im.begin(), im.end());
   std::cout << serializer(j).execute() << std::endl;
 
   std::map<std::string, bool> bm({
     {"abc", true},
     {"def", false}
   });
-  j = object_util::to_json(bm);
+  j = object::util::to_json(bm);
   std::cout << serializer(j).execute() << std::endl;
 
-  j = object_util::create([](auto& obj){
+  j = object::util::create([](auto& obj){
     obj["foo"] = true;
     obj["bar"] = 123;
     obj["baz"] = "baz";
   });
   std::cout << serializer(j).execute() << std::endl;
 
-  object_util::edit(j, [](auto& obj){
+  object::util::edit(j, [](auto& obj){
     obj.erase("baz");
     obj.insert({"inner", array{1, 2.4, true}});
   });
@@ -387,7 +387,7 @@ void test_016() {
     {"abc", 1},
     {"def", 2}
   });
-  json::sp j = object_util::to_json(im.begin(), im.end()).to_shared();
+  json::sp j = object::util::to_json(im.begin(), im.end()).to_shared();
   valueValidation<int>((*j)["abc"], 1, compare::same);
 }
 
