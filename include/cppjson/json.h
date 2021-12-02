@@ -42,6 +42,13 @@ public:
   template<> struct value_type_traits<undefined_type> : public traits_holder<undefined_type , true, value_type_id::undefined> {};
   template<typename T> struct value_type_traits       { static constexpr bool available = false; };
 
+  /** T&& を受ける場合、const と 参照を外して value_type_traits を判定する */
+  template <typename T> struct pure_value_type_traits : public value_type_traits<
+    typename std::remove_const<
+      typename std::remove_reference<T>::type
+    >::type
+  > {};
+
   /** int64_t に変換可能か判定する */
   template <typename T> struct is_integer_compatible {
     static constexpr bool value = std::is_integral<T>::value && (!std::is_same<T, bool>::value);
@@ -115,12 +122,7 @@ private:
       *this = std::move(src);
     }
 
-    template <typename T, std::enable_if_t<value_type_traits<T>::available, bool> = true>
-    value_container(const T& value): m_value_type_id(value_type_id::undefined) {
-      set(T(value));  /** 値をここでコピーしてから渡す */
-    }
-
-    template <typename T, std::enable_if_t<value_type_traits<T>::available, bool> = true>
+    template <typename T, std::enable_if_t<pure_value_type_traits<T>::available, bool> = true>
     value_container(T&& value): m_value_type_id(value_type_id::undefined) {
       set(std::forward<T>(value));
     }
@@ -179,18 +181,28 @@ private:
     template <typename T, std::enable_if_t<value_type_traits<T>::available && std::is_class<T>::value, bool> = true>
     T& get() { return **reinterpret_cast<T**>(&m_content); }
 
-    template <typename T, std::enable_if_t<value_type_traits<T>::available && !std::is_class<T>::value, bool> = true>
+    template <
+      typename T,
+      typename PURE_T = typename pure_value_type_traits<T>::type,
+      enum value_type_id VALUE_TYPE_ID = pure_value_type_traits<T>::value_type_id,
+      std::enable_if_t<!std::is_class<PURE_T>::value, bool> = true
+    >
     void set(T&& value) {
       destruct_value();
-      m_value_type_id = value_type_traits<T>::value_type_id;
-      *reinterpret_cast<T*>(&m_content) = T(std::forward<T>(value));
+      m_value_type_id = VALUE_TYPE_ID;
+      *reinterpret_cast<PURE_T*>(&m_content) = std::forward<T>(value);
     }
 
-    template <typename T, std::enable_if_t<value_type_traits<T>::available && std::is_class<T>::value, bool> = true>
+    template <
+      typename T,
+      typename PURE_T = typename pure_value_type_traits<T>::type,
+      enum value_type_id VALUE_TYPE_ID = pure_value_type_traits<T>::value_type_id,
+      std::enable_if_t<std::is_class<PURE_T>::value, bool> = true
+    >
     void set(T&& value) {
       destruct_value();
-      m_value_type_id = value_type_traits<T>::value_type_id;
-      *reinterpret_cast<T**>(&m_content) = new T(std::forward<T>(value));
+      m_value_type_id = VALUE_TYPE_ID;
+      *reinterpret_cast<PURE_T**>(&m_content) = new PURE_T(std::forward<T>(value));
     }
   };
 
@@ -251,14 +263,7 @@ public:
 
   /** その他の許容可能な型 */
   template <typename T, std::enable_if_t<
-    value_type_traits<T>::available &&
-    (!is_number_type<T>::value)
-  , bool> = true>
-  json(const T& v) : m_value(v) {}
-
-  /** その他の許容可能な型 */
-  template <typename T, std::enable_if_t<
-    value_type_traits<T>::available &&
+    pure_value_type_traits<T>::available &&
     (!is_number_type<T>::value)
   , bool> = true>
   json(T&& v) : m_value(std::forward<T>(v)) {}
