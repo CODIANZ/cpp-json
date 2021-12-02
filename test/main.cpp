@@ -63,7 +63,7 @@ void test_001() {
   { json a(std::string("abc")); }
   { json a(true); }
   { json a(nullptr); }
-  { json a({1, "abc", true}); }
+  { json a(array{1, "abc", true}); }
   { json a({{"key1", "value1"}, {"key2", 1.23}}); }
   { json a(123456789ll); }
   { json a(1.2345678); }
@@ -78,13 +78,17 @@ void test_002() {
   a = std::string("abc");
   a = true;
   a = nullptr;
-  a = {1, "abc", true};
+  a = array{1, "abc", true};
   a = {{"key1", "value1"}, {"key2", 1.23}};
   a = 123456789ll;
   a = 1.2345678;
   a = 456;
   a = 1.2345678f;
   a = "c-string";
+  const std::string s("const");
+  a = s;
+  a = array{s, s, s};
+  a = {{"key", s}, {s, "value"}};
 }
 
 /** setter */
@@ -93,13 +97,17 @@ void test_003() {
   a.set(std::string("abc"));
   a.set(true);
   a.set(nullptr);
-  a.set({1, "abc", true});
+  a.set(array{1, "abc", true});
   a.set({{"key1", "value1"}, {"key2", 1.23}});
   a.set(123456789ll);
   a.set(1.2345678);
   a.set(456);
   a.set(1.2345678f);
   a.set("c-string");
+  const std::string s("const");
+  a.set(s);
+  a.set(array{s, s, s});
+  a.set({{"key", s}, {s, "value"}});
 }
 
 /** copy & move */
@@ -167,11 +175,11 @@ void test_005() {
 
 void test_006() {
   {
-    json x({1, 2, 3});
+    json x(array{1, 2, 3});
     valueValidation<int>(x.get<json::array_type>()[2], 3, compare::same);
   }
   {
-    json x({ "a", "b", "c"});
+    json x(array{ "a", "b", "c"});
     valueValidation<std::string>(x.get<json::array_type>()[1], "b", compare::same);
   }
 
@@ -187,8 +195,8 @@ void test_006() {
     json x = {
       {"aaa", 1},
       {"bbb", 1.5},
-      {"ccc", {"abc", 1.234, true}},
-      {"ddd", {1, 2}},
+      {"ccc", array{"abc", 1.234, true}},
+      {"ddd", array{1, 2}},
       {"eee", {
         {"1", 1.0},
         {"2", "2.0"}
@@ -198,12 +206,12 @@ void test_006() {
     valueValidation<int>(path_util::find(x, "ddd")->get<json::array_type>()[1], 2, compare::same);
   }
   {
-    json y = {1, "abc", true};
+    json y = array{1, "abc", true};
     json x;
     x = 1;
     x.set({{"aa", 2.54}, {"bbb", true}});
-    x.set({1, 2, "true", true});
-    x = {1, "abc"};
+    x.set(array{1, 2, "true", true});
+    x = array{1, "abc"};
     x = {{"aa", 1}, {"bb", 22}};
   }
 }
@@ -225,6 +233,7 @@ void test_007() {
     }
   )");
   auto jj = deserializer(ss).execute();
+  std::cout << serializer(jj).execute() << std::endl;
   valueValidation<int>(path_util::find(jj, "user_id"), 123, compare::same);
 
   valueValidation<int>(path_util::find(jj, "obj.value1"), 1, compare::same);
@@ -308,8 +317,8 @@ void test_013() {
   json x = {
     {"aaa", 1},
     {"bbb", 1.5},
-    {"ccc", {"abc", 1.234, true}},
-    {"ddd", {1, 2}},
+    {"ccc", array{"abc", 1.234, true}},
+    {"ddd", array{1, 2}},
     {"eee", {
       {"1", 1.0},
       {"2", "2.0"}
@@ -321,21 +330,21 @@ void test_013() {
 
 void test_014() {
   std::vector<int> iv({1, 2, 3, 4});
-  json j = array_util::to_json(iv.begin(), iv.end());
+  json j = array::util::to_json(iv.begin(), iv.end());
   std::cout << serializer(j).execute() << std::endl;
 
   std::list<std::string> sv({"abc", "def", "ghi"});
-  j = array_util::to_json(sv);
+  j = array::util::to_json(sv);
   std::cout << serializer(j).execute() << std::endl;
 
-  j = array_util::create([](auto& arr){
+  j = array::util::create([](auto& arr){
     arr.push_back(true);
     arr.push_back(123);
     arr.push_back("baz");
   });
   std::cout << serializer(j).execute() << std::endl;
 
-  array_util::edit(j, [](auto& arr){
+  array::util::edit(j, [](auto& arr){
     arr.pop_back();
     arr.push_back({
       {"inner", 1}
@@ -349,26 +358,26 @@ void test_015() {
     {"abc", 1},
     {"def", 2}
   });
-  json j = object_util::to_json(im.begin(), im.end());
+  json j = object::util::to_json(im.begin(), im.end());
   std::cout << serializer(j).execute() << std::endl;
 
   std::map<std::string, bool> bm({
     {"abc", true},
     {"def", false}
   });
-  j = object_util::to_json(bm);
+  j = object::util::to_json(bm);
   std::cout << serializer(j).execute() << std::endl;
 
-  j = object_util::create([](auto& obj){
+  j = object::util::create([](auto& obj){
     obj["foo"] = true;
     obj["bar"] = 123;
     obj["baz"] = "baz";
   });
   std::cout << serializer(j).execute() << std::endl;
 
-  object_util::edit(j, [](auto& obj){
+  object::util::edit(j, [](auto& obj){
     obj.erase("baz");
-    obj.insert({"inner", {1, 2.4, true}});
+    obj.insert({"inner", array{1, 2.4, true}});
   });
   std::cout << serializer(j).execute() << std::endl;
 }
@@ -378,7 +387,7 @@ void test_016() {
     {"abc", 1},
     {"def", 2}
   });
-  json::sp j = object_util::to_json(im.begin(), im.end()).to_shared();
+  json::sp j = object::util::to_json(im.begin(), im.end()).to_shared();
   valueValidation<int>((*j)["abc"], 1, compare::same);
 }
 
@@ -406,18 +415,18 @@ void test_018() {
    *   {"key2", "value2"}
    * }
    **/
-  json j = {
+  json j = array{
     1,
-    json{ 2, 3 }
+    array{ 2, 3 }
   };
   valueValidation<int>(j[0], 1, compare::same);
   valueValidation<int>(j[1][0], 2, compare::same);
   valueValidation<int>(j[1][1], 3, compare::same);
   
-  j = {
-    json{ 1, true },
+  j = array{
+    array{ 1, true },
     3,
-    json{
+    object{
       {"key1", "value1"},
       {"key2", "value2"}
     }
@@ -431,7 +440,7 @@ void test_018() {
   /** object内の array や object のネストは問題ない */
   j = {
     {"key1", "value1"},
-    {"key2", {"value2-1", 123}},
+    {"key2", array{"value2-1", 123}},
     {"key3", {
       {"value3-1", 1},
       {"value3-2", false}

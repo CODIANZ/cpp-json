@@ -17,7 +17,7 @@ json を C++ で取り扱うためのライブラリです。
 ## インストール
 
 * このプロジェクトのビルドは不要です。
-* このプロジェクト内の `include` ディレクトリをインクルード検索ディレクトリパスに設定する。
+* このプロジェクト内の `include` ディレクトリをインクルード検索ディレクトリパスに設定します。
 * `#include <cppjson/cppjson.h>` と書けば全ての機能が使えます。
 
 
@@ -170,25 +170,41 @@ x.get<float>();   /* ok */
 
 ## 注意事項
 
-### array 内の array や object がネストする場合の初期化
+### array の初期化
 
-array内に array や object がネストする場合、array の初期化は、initalizer_list　ではなく可変引数テンプレートが採用されるため、入れ子になった array や object は json を明示する必要がある。
+json には object を生成することはできますが、array を生成することはできません。
+これは、C++の言語仕様上、 `{{"a", "b"}}` が `a` というプロパティを持つオブジェクトなのか、 `a`と`b`を持つ配列を１個保有する配列（二次元配列）なのかが判別できないからです。
+そこで、cppjsonは array を保持する json 生成を json　のサブクラスで実装しています。
+なお、 object を保持する json 生成も明示できるようサブクラスが用意されています。
 
 ```cpp
-json j = {
-  json{ 1, true },
+/** object を生成 */
+json obj = {{"key", "value"}};
+json obj2 = object{{"key", "value"}};
+
+/** array を生成 */
+json arr = array{"1", "2"};
+```
+
+### array 内に array や object がネストする場合
+
+array内に array や object がネストする場合、array の初期化は、initalizer_list　ではなく可変引数テンプレートが採用されるため、入れ子になった array や object はこれらを明示する必要があります。
+
+```cpp
+json arr = {
+  array{ 1, true },
   3,
-  json{
+  object{
     {"key1", "value1"},
     {"key2", "value2"}
   }
 };
 ```
 
-object内の array や object のネストは問題ない。
+object内の array や object のネストは問題ありません。
 
 ```cpp
-json j = {
+json obj = {
   {"key1", "value1"},
   {"key2", {"value2-1", 123}},
   {"key3", {
@@ -198,15 +214,23 @@ json j = {
 };
 ```
 
-この点につき、改善しようか悩んだが、下記のようなケースを考えると、これが object なのか、文字列の２次元配列なのか判別しようがなく、最終的にはコンパイル時に ambiguous だと怒られるのオチなので、この仕様のままとする。
+また、下記のように object なのか string の二次元配列なのか曖昧な場合は、objectが優先的に採用されます。
 
 ```cpp
-json j = {
+json obj = {
   {"1", "2"},
   {"3", "4"}
 };
 ```
 
+したがって、string の二次元配列にしたい場合には下記のように明示をする。
+
+```cpp
+json arr = {
+  array{"1", "2"},
+  array{"3", "4"}
+};
+```
 
 
 ## ライセンス

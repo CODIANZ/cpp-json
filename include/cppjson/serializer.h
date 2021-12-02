@@ -49,30 +49,30 @@ private:
   }
 
   void proceed(std::ostream& os, const json& j, int level) const {
-    switch(j.value_type()) {
-      case json::value_type::integral: {
+    switch(j.value_type_id()) {
+      case json::value_type_id::integral: {
         os << j.get<int64_t>();
         break;
       }
-      case json::value_type::floating_point: {
+      case json::value_type_id::floating_point: {
         os << j.get<double>();
         break;
       }
-      case json::value_type::string: {
+      case json::value_type_id::string: {
         os << "\"";
         escape(os, j.get<std::string>());
         os << "\"";
         break;
       }
-      case json::value_type::boolean: {
+      case json::value_type_id::boolean: {
         os << (j.get<bool>() ? "true" : "false");
         break;
       }
-      case json::value_type::null: {
+      case json::value_type_id::null: {
         os << "null";
         break;
       }
-      case json::value_type::array: {
+      case json::value_type_id::array: {
         os << "[";
         insertNewLine(os);
         const auto& arr = j.get<json::array_type>();
@@ -89,7 +89,7 @@ private:
         os << "]";
         break;
       }
-      case json::value_type::object: {
+      case json::value_type_id::object: {
         os << "{";
         insertNewLine(os);
         const auto& obj = j.get<json::object_type>();
@@ -110,7 +110,7 @@ private:
         os << "}";
         break;
       }
-      case json::value_type::undefined: {
+      case json::value_type_id::undefined: {
         /**
          * json では undefined を表現できない。
          * また、JSON.strigify()では undefined は null となるため仕様を合わせた
