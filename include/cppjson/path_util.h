@@ -25,7 +25,7 @@ public:
 
   /** path に従って値を取得する。存在しない場合は nullptr を返却する。 */
   static const json* find(const json& j, const std::string& path, const char separator = '.') {
-    if(j.value_type() != json::value_type::object) return nullptr;
+    if(j.value_type_id() != json::value_type_id::object) return nullptr;
     auto&& obj = j.get<json::object_type>();
     const auto pos = path.find(separator);
     if(pos == std::string::npos){
@@ -42,7 +42,7 @@ public:
 
   /** path に従って値を取得する。存在しない場合は nullptr を返却する。 */
   static json* find(json& j, const std::string& path, const char separator = '.') {
-    if(j.value_type() != json::value_type::object) return nullptr;
+    if(j.value_type_id() != json::value_type_id::object) return nullptr;
     auto&& obj = j.get<json::object_type>();
     const auto pos = path.find(separator);
     if(pos == std::string::npos){
@@ -59,7 +59,7 @@ public:
 
   /** path に従って値を取得する。存在しない or 非object の場合は作成を行う。object の場合には値を追加する。 */
   static void put(json& j, const std::string& path, const json& value, const char separator = '.') {
-    if(j.value_type() != json::value_type::object){
+    if(j.value_type_id() != json::value_type_id::object){
       j.set(json::object_type());
     }
     auto&& obj = j.get<json::object_type>();

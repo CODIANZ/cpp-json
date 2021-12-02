@@ -20,19 +20,26 @@ public:
   using array_type = std::vector<json>;
   using object_type = std::unordered_map<std::string, json>;
 
-  /** value_container で保持している型（integral と floating_point はjsではNumber型だが、この世界では別の型として区別する） */
-  enum class value_type { integral, floating_point, boolean, null, string, array, object, undefined };
+  /** value_container で保持している型を値として取り扱うための ID （integral と floating_point はjsではNumber型だが、この世界では別の型として区別する） */
+  enum class value_type_id { integral, floating_point, boolean, null, string, array, object, undefined };
+
+  /** value_type_traits で有効な型の特性を保有する */
+  template<typename T, bool AVAILABLE, value_type_id VALUE_TYPE_ID> struct traits_holder {
+    using                           type = T;
+    static constexpr bool           available     = AVAILABLE;
+    static constexpr value_type_id  value_type_id = VALUE_TYPE_ID;
+  };
 
   /** value_container で保持できる型を traits で列挙 */
   template<typename T> struct value_type_traits;
-  template<> struct value_type_traits<int64_t       > { static constexpr bool available = true;  static constexpr const char* const name = "integral"  ; static constexpr value_type type = value_type::integral; };
-  template<> struct value_type_traits<double        > { static constexpr bool available = true;  static constexpr const char* const name = "double"    ; static constexpr value_type type = value_type::floating_point; };
-  template<> struct value_type_traits<bool          > { static constexpr bool available = true;  static constexpr const char* const name = "bool"      ; static constexpr value_type type = value_type::boolean; };
-  template<> struct value_type_traits<nullptr_t     > { static constexpr bool available = true;  static constexpr const char* const name = "null"      ; static constexpr value_type type = value_type::null; };
-  template<> struct value_type_traits<std::string   > { static constexpr bool available = true;  static constexpr const char* const name = "string"    ; static constexpr value_type type = value_type::string; };
-  template<> struct value_type_traits<array_type    > { static constexpr bool available = true;  static constexpr const char* const name = "array"     ; static constexpr value_type type = value_type::array; };
-  template<> struct value_type_traits<object_type   > { static constexpr bool available = true;  static constexpr const char* const name = "object"    ; static constexpr value_type type = value_type::object; };
-  template<> struct value_type_traits<undefined_type> { static constexpr bool available = false; static constexpr const char* const name = "undefined" ; static constexpr value_type type = value_type::undefined; };
+  template<> struct value_type_traits<int64_t       > : public traits_holder<int64_t        , true, value_type_id::integral> {};
+  template<> struct value_type_traits<double        > : public traits_holder<double         , true, value_type_id::floating_point> {};
+  template<> struct value_type_traits<bool          > : public traits_holder<bool           , true, value_type_id::boolean> {};
+  template<> struct value_type_traits<nullptr_t     > : public traits_holder<nullptr_t      , true, value_type_id::null> {};
+  template<> struct value_type_traits<std::string   > : public traits_holder<std::string    , true, value_type_id::string> {};
+  template<> struct value_type_traits<array_type    > : public traits_holder<array_type     , true, value_type_id::array> {};
+  template<> struct value_type_traits<object_type   > : public traits_holder<object_type    , true, value_type_id::object> {};
+  template<> struct value_type_traits<undefined_type> : public traits_holder<undefined_type , true, value_type_id::undefined> {};
   template<typename T> struct value_type_traits       { static constexpr bool available = false; };
 
   /** int64_t に変換可能か判定する */
@@ -55,6 +62,20 @@ public:
   sp to_shared() { return std::make_shared<json>(std::move(*this)); }
 
 private:
+  /** debug での使用を想定 */
+  static const char* value_type_string(enum value_type_id value_type_id) { 
+    switch(value_type_id) {
+      case value_type_id::integral:        { return "integral"; }
+      case value_type_id::floating_point:  { return "floating_point"; }
+      case value_type_id::boolean:         { return "boolean"; }
+      case value_type_id::null:            { return "null"; }
+      case value_type_id::string:          { return "string"; }
+      case value_type_id::array:           { return "array"; }
+      case value_type_id::object:          { return "object"; }
+      default: /** undefined */            { return "undefined"; }
+    }
+  }
+
   /**
    * 値を保有するクラス
    * class インスタンスはポインタで保有、その他は実体を保有する。
@@ -71,36 +92,36 @@ private:
       object_type*  _object_ptr;
     };
     content         m_content;
-    value_type      m_value_type;
+    value_type_id   m_value_type_id;
 
     /** 内包する値の解放（classインスタンスは削除するが、それ以外は何もしない） */
     void destruct_value() {
-      switch(value_type()){
-        case value_type::string:  { delete m_content._string_ptr; break; }
-        case value_type::array:   { delete m_content._array_ptr; break; }
-        case value_type::object:  { delete m_content._object_ptr; break; }
+      switch(value_type_id()){
+        case value_type_id::string:  { delete m_content._string_ptr; break; }
+        case value_type_id::array:   { delete m_content._array_ptr; break; }
+        case value_type_id::object:  { delete m_content._object_ptr; break; }
         default: { break; } /** class インスタンスでなければ何もしない */
       }
     }
 
   public:
-    value_container(): m_value_type(value_type::undefined) {}
+    value_container(): m_value_type_id(value_type_id::undefined) {}
 
-    value_container(const value_container& src): m_value_type(value_type::undefined) {
+    value_container(const value_container& src): m_value_type_id(value_type_id::undefined) {
       *this = src;
     }
 
-    value_container(value_container&& src): m_value_type(value_type::undefined) {
+    value_container(value_container&& src): m_value_type_id(value_type_id::undefined) {
       *this = std::move(src);
     }
 
     template <typename T, std::enable_if_t<value_type_traits<T>::available, bool> = true>
-    value_container(const T& value): m_value_type(value_type::undefined) {
+    value_container(const T& value): m_value_type_id(value_type_id::undefined) {
       set(T(value));  /** 値をここでコピーしてから渡す */
     }
 
     template <typename T, std::enable_if_t<value_type_traits<T>::available, bool> = true>
-    value_container(T&& value): m_value_type(value_type::undefined) {
+    value_container(T&& value): m_value_type_id(value_type_id::undefined) {
       set(std::forward<T>(value));
     }
 
@@ -110,50 +131,40 @@ private:
       destruct_value();
       auto clone = src.clone();     /** コピーを生成 */
       m_content = clone.m_content;  /** clone からcontentの所有権移転 */
-      m_value_type = clone.m_value_type;
+      m_value_type_id = clone.m_value_type_id;
       /**
        * 複製したオブジェクト（clone）はconetntの所有権を失ったので、
        * オブジェクトを undefined とし、この関数のスコープを抜ける際に delete されないようにする */
-      clone.m_value_type = value_type_traits<undefined_type>::type;
+      clone.m_value_type_id = value_type_traits<undefined_type>::value_type_id;
       return *this;
     }
 
     value_container& operator = (value_container&& src){
       destruct_value();
       m_content = src.m_content;    /** src からcontentの所有権移転 */
-      m_value_type = src.m_value_type;
+      m_value_type_id = src.m_value_type_id;
       /** srcはcontentの所有権を失ったので undefined とし delete しないようにする */
-      src.m_value_type = value_type_traits<undefined_type>::type;
+      src.m_value_type_id = value_type_traits<undefined_type>::value_type_id;
       return *this;
     }
 
     value_container clone() const {
-      switch(value_type()){
-        case value_type::integral:        { return value_container(m_content._integer); }
-        case value_type::floating_point:  { return value_container(m_content._floating_point); }
-        case value_type::boolean:         { return value_container(m_content._boolean); }
-        case value_type::null:            { return value_container(m_content._null); }
-        case value_type::string:          { return value_container(*m_content._string_ptr); }
-        case value_type::array:           { return value_container(*m_content._array_ptr); }
-        case value_type::object:          { return value_container(*m_content._object_ptr); }
-        default: /** undefined */         { return value_container(); }
+      switch(value_type_id()){
+        case value_type_id::integral:       { return value_container(m_content._integer); }
+        case value_type_id::floating_point: { return value_container(m_content._floating_point); }
+        case value_type_id::boolean:        { return value_container(m_content._boolean); }
+        case value_type_id::null:           { return value_container(m_content._null); }
+        case value_type_id::string:         { return value_container(*m_content._string_ptr); }
+        case value_type_id::array:          { return value_container(*m_content._array_ptr); }
+        case value_type_id::object:         { return value_container(*m_content._object_ptr); }
+        default: /** undefined */           { return value_container(); }
       }
     }
 
-    const value_type value_type() const { return m_value_type; }
+    const value_type_id value_type_id() const { return m_value_type_id; }
 
-    /** debug での使用を想定 */
-    const char* value_type_string() const { 
-      switch(value_type()) {
-        case value_type::integral:        { return value_type_traits<int64_t>::name; }
-        case value_type::floating_point:  { return value_type_traits<double>::name; }
-        case value_type::boolean:         { return value_type_traits<bool>::name; }
-        case value_type::null:            { return value_type_traits<nullptr_t>::name; }
-        case value_type::string:          { return value_type_traits<std::string>::name; }
-        case value_type::array:           { return value_type_traits<array_type>::name; }
-        case value_type::object:          { return value_type_traits<object_type>::name; }
-        default: /** undefined */         { return value_type_traits<undefined_type>::name; }
-      }
+    const char* value_type_string() const {
+      return json::value_type_string(value_type_id());
     }
 
     template <typename T, std::enable_if_t<value_type_traits<T>::available && !std::is_class<T>::value, bool> = true>
@@ -171,14 +182,14 @@ private:
     template <typename T, std::enable_if_t<value_type_traits<T>::available && !std::is_class<T>::value, bool> = true>
     void set(T&& value) {
       destruct_value();
-      m_value_type = value_type_traits<T>::type;
+      m_value_type_id = value_type_traits<T>::value_type_id;
       *reinterpret_cast<T*>(&m_content) = T(std::forward<T>(value));
     }
 
     template <typename T, std::enable_if_t<value_type_traits<T>::available && std::is_class<T>::value, bool> = true>
     void set(T&& value) {
       destruct_value();
-      m_value_type = value_type_traits<T>::type;
+      m_value_type_id = value_type_traits<T>::value_type_id;
       *reinterpret_cast<T**>(&m_content) = new T(std::forward<T>(value));
     }
   };
@@ -188,10 +199,10 @@ private:
 
   /** 整数型、浮動小数点の相互型変換を考慮した値取得 */
   template <typename T> T getNumberValue() const {
-    if(m_value.value_type() == value_type::integral){
+    if(m_value.value_type_id() == value_type_id::integral){
       return static_cast<T>(m_value.get<int64_t>());
     }
-    else if(m_value.value_type() == value_type::floating_point){
+    else if(m_value.value_type_id() == value_type_id::floating_point){
       return static_cast<T>(m_value.get<double>());
     }
     else{
@@ -203,7 +214,7 @@ private:
   template<typename T, std::enable_if_t<value_type_traits<T>::available, bool> = true>
   [[noreturn]] static void throw_bad_cast(const std::string& from) {
     std::stringstream ss;
-    ss << "bad_cast: " << from << " -> " << value_type_traits<T>::name;
+    ss << "bad_cast: " << from << " -> " << value_type_string(value_type_traits<T>::value_type_id);
     throw new bad_cast(ss.str());
   }
   template<typename T, std::enable_if_t<!value_type_traits<T>::available, bool> = true>
@@ -292,7 +303,7 @@ public:
   , bool> = true>
   const T& get() const {
     if(is_undefined()) value_is_undefined::throw_error();
-    if(value_type() != value_type_traits<T>::type){
+    if(value_type_id() != value_type_traits<T>::value_type_id){
       throw_bad_cast<T>(m_value.value_type_string());
     }
     return m_value.get<T>();
@@ -303,7 +314,7 @@ public:
   , bool> = true>
   T& get() {
     if(is_undefined()) value_is_undefined::throw_error();
-    if(value_type() != value_type_traits<T>::type){
+    if(value_type_id() != value_type_traits<T>::value_type_id){
       throw_bad_cast<T>(m_value.value_type_string());
     }
     return m_value.get<T>();
@@ -326,11 +337,11 @@ public:
 
   /************** 状態・属性 ***************/
   /** 値の型を取得 */
-  const value_type value_type() const { return m_value.value_type(); }
+  const value_type_id value_type_id() const { return m_value.value_type_id(); }
 
   /* undefined, null 確認用関数 */
-  bool is_undefined() const         { return value_type() == value_type::undefined; }
-  bool is_null() const              { return value_type() == value_type::null; }
+  bool is_undefined() const         { return value_type_id() == value_type_id::undefined; }
+  bool is_null() const              { return value_type_id() == value_type_id::null; }
   bool is_null_or_undefined() const { return is_undefined() || is_null(); }
 
   /* 値が存在するのか判定 */
@@ -339,13 +350,13 @@ public:
   /** T で取得可能か判定する */
   template<typename T, std::enable_if_t<is_number_type<T>::value, bool> = true>
   bool acquirable() const {
-    auto&& self_type = value_type();
-    return self_type == value_type::integral || self_type == value_type::floating_point;
+    auto&& self_type_id = value_type_id();
+    return self_type_id == value_type_id::integral || self_type_id == value_type_id::floating_point;
   }
 
   template<typename T, std::enable_if_t<value_type_traits<T>::available && !is_number_type<T>::value, bool> = true>
   bool acquirable() const {
-    return value_type() == value_type_traits<T>::type;
+    return value_type_id() == value_type_traits<T>::value_type_id;
   }
 
   /************** operator [] ***************/
@@ -353,7 +364,7 @@ public:
 
   /** const では見つからない場合、 undefined を返却する */
   const json& operator [](const char * key) const {
-    if(value_type() != value_type::object) return undefined();
+    if(value_type_id() != value_type_id::object) return undefined();
     auto&& obj = get<object_type>();
     auto it = obj.find(key);
     return it != obj.end() ? it->second : undefined();
@@ -365,7 +376,7 @@ public:
 
   /** 非const では見つからない場合、 object を作成する */
   json& operator [](const char * key) {
-    if(value_type() != value_type::object){
+    if(value_type_id() != value_type_id::object){
       m_value.set(object_type());
     }
     auto&& obj = get<object_type>();
@@ -383,14 +394,14 @@ public:
 
   /** const では見つからない場合、 undefined を返却する */
   const json& operator [](int index) const {
-    if(value_type() != value_type::array) return undefined();
+    if(value_type_id() != value_type_id::array) return undefined();
     auto&& arr = get<array_type>();
     return (index < arr.size()) ? arr[index] : undefined();
   }
 
   /** 非const では見つからない場合、 欠番を nullptr で埋める */
   json& operator [](int index) {
-    if(value_type() != value_type::array){
+    if(value_type_id() != value_type_id::array){
       m_value.set(array_type());
     }
     auto&& arr = get<array_type>();
