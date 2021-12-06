@@ -23,24 +23,24 @@ public:
   /** value_container で保持している型を値として取り扱うための ID （integral と floating_point はjsではNumber型だが、この世界では別の型として区別する） */
   enum class value_type_id { integral, floating_point, boolean, null, string, array, object, undefined };
 
-  /** value_type_traits で有効な型の特性を保有する */
-  template<typename T, bool AVAILABLE, value_type_id VALUE_TYPE_ID> struct traits_holder {
+  /** value_type_traits で有効な型の特性（使用可否・型・型ID）を保有する */
+  template<typename T, value_type_id VALUE_TYPE_ID> struct traits_holder {
+    static constexpr bool           available = true;
     using                           type = T;
-    static constexpr bool           available     = AVAILABLE;
     static constexpr value_type_id  value_type_id = VALUE_TYPE_ID;
   };
 
   /** value_container で保持できる型を traits で列挙 */
   template<typename T> struct value_type_traits;
-  template<> struct value_type_traits<int64_t       > : public traits_holder<int64_t        , true, value_type_id::integral> {};
-  template<> struct value_type_traits<double        > : public traits_holder<double         , true, value_type_id::floating_point> {};
-  template<> struct value_type_traits<bool          > : public traits_holder<bool           , true, value_type_id::boolean> {};
-  template<> struct value_type_traits<nullptr_t     > : public traits_holder<nullptr_t      , true, value_type_id::null> {};
-  template<> struct value_type_traits<std::string   > : public traits_holder<std::string    , true, value_type_id::string> {};
-  template<> struct value_type_traits<array_type    > : public traits_holder<array_type     , true, value_type_id::array> {};
-  template<> struct value_type_traits<object_type   > : public traits_holder<object_type    , true, value_type_id::object> {};
-  template<> struct value_type_traits<undefined_type> : public traits_holder<undefined_type , true, value_type_id::undefined> {};
-  template<typename T> struct value_type_traits       { static constexpr bool available = false; };
+  template<> struct value_type_traits<int64_t       > : public traits_holder<int64_t        , value_type_id::integral> {};
+  template<> struct value_type_traits<double        > : public traits_holder<double         , value_type_id::floating_point> {};
+  template<> struct value_type_traits<bool          > : public traits_holder<bool           , value_type_id::boolean> {};
+  template<> struct value_type_traits<nullptr_t     > : public traits_holder<nullptr_t      , value_type_id::null> {};
+  template<> struct value_type_traits<std::string   > : public traits_holder<std::string    , value_type_id::string> {};
+  template<> struct value_type_traits<array_type    > : public traits_holder<array_type     , value_type_id::array> {};
+  template<> struct value_type_traits<object_type   > : public traits_holder<object_type    , value_type_id::object> {};
+  template<> struct value_type_traits<undefined_type> : public traits_holder<undefined_type , value_type_id::undefined> {};
+  template<typename T> struct value_type_traits       { static constexpr bool available = false; }; /** その他 = 使用できない型 */
 
   /** T&& を受ける場合、const と 参照を外して value_type_traits を判定する */
   template <typename T> struct pure_value_type_traits : public value_type_traits<
