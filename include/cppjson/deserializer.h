@@ -359,18 +359,17 @@ private:
       ss << c;
     }
     auto&& s = ss.str();
-    std::vector<char> verr(s.size());
-    char* err = verr.data();
+    char* err;
     if(bFloat){
       auto v = ::strtod(ss.str().c_str(), &err);
-      if(verr[0] != 0){
+      if(err[0] != 0){
         throwError("cannot convert to double value");
       }
       j.set(v);
     }
     else{
       auto v = ::strtoll(ss.str().c_str(), &err, 10);
-      if(verr[0] != 0){
+      if(err[0] != 0){
         throwError("cannot convert to integral value");
       }
       j.set(v);
