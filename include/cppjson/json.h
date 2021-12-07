@@ -209,19 +209,6 @@ private:
   /** json で保持する唯一の値 */
   value_container m_value;
 
-  /** 整数型、浮動小数点の相互型変換を考慮した値取得 */
-  template <typename T> T getNumberValue() const {
-    if(m_value.value_type_id() == value_type_id::integral){
-      return static_cast<T>(m_value.get<int64_t>());
-    }
-    else if(m_value.value_type_id() == value_type_id::floating_point){
-      return static_cast<T>(m_value.get<double>());
-    }
-    else{
-      throw_bad_cast<T>(m_value.value_type_string());
-    }
-  }
-
   /** 型変換不能エラー */
   template<typename T, std::enable_if_t<value_type_traits<T>::available, bool> = true>
   [[noreturn]] static void throw_bad_cast(const std::string& from) {
@@ -290,17 +277,19 @@ public:
 
 
   /************** 取得 ***************/
-  /** 整数型（int_64tからの型変換を許容するため参照ではなく値のコピーを返却する点に注意） */
-  template <typename T, std::enable_if_t<is_integer_compatible<T>::value, bool> = true>
+  /** number型（int_64 or doubletからの型変換を許容するため参照ではなく値のコピーを返却する点に注意） */
+  template <typename T, std::enable_if_t<is_number_type<T>::value, bool> = true>
   const T get() const {
     if(is_undefined()) value_is_undefined::throw_error();
-    return getNumberValue<T>();
-  }
-  /** 浮動小数点型（doubleからの型変換を許容するため参照ではなく値のコピーを返却する点に注意） */
-  template <typename T, std::enable_if_t<is_floating_point_compatible<T>::value, bool> = true>
-  const T get() const {
-    if(is_undefined()) value_is_undefined::throw_error();
-    return getNumberValue<T>();
+    if(m_value.value_type_id() == value_type_id::integral){
+      return static_cast<T>(m_value.get<int64_t>());
+    }
+    else if(m_value.value_type_id() == value_type_id::floating_point){
+      return static_cast<T>(m_value.get<double>());
+    }
+    else{
+      throw_bad_cast<T>(m_value.value_type_string());
+    }
   }
   /** その他の許容可能な型（const） */
   template <typename T, std::enable_if_t<
