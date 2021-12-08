@@ -30,13 +30,13 @@ void valueValidation(const json& j, const EXCEPTED_VALUE_TYPE& exceptedValue, co
       }
     }
   }
-  catch(std::exception* e){
+  catch(std::exception& e){
     if(exceptedCompareResult == compare::same){
-      std::cerr << "ng: " << e->what() << std::endl;
+      std::cerr << "ng: " << e.what() << std::endl;
       assert(false);
     }
     else{
-      std::cout << "ok: " << e->what() << std::endl;
+      std::cout << "ok: " << e.what() << std::endl;
     }
   }
 }

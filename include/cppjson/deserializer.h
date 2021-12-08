@@ -86,7 +86,7 @@ private:
   [[noreturn]] void throwError(const std::string& err) {
     std::stringstream ss;
     ss << "line(" << m_stream.line() << "), col(" << m_stream.col() << ") : " << err;
-    throw new bad_json(ss.str());
+    throw bad_json(ss.str());
   }
 
   static bool is_blacket(char c) {

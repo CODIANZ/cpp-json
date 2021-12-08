@@ -214,13 +214,13 @@ private:
   [[noreturn]] static void throw_bad_cast(const std::string& from) {
     std::stringstream ss;
     ss << "bad_cast: " << from << " -> " << value_type_string(value_type_traits<T>::value_type_id);
-    throw new bad_cast(ss.str());
+    throw bad_cast(ss.str());
   }
   template<typename T, std::enable_if_t<!value_type_traits<T>::available, bool> = true>
   [[noreturn]] static void throw_bad_cast(const std::string& from) {
     std::stringstream ss;
     ss << "bad_cast: " << from << " -> " << typeid(T).name();
-    throw new bad_cast(ss.str());
+    throw bad_cast(ss.str());
   }
   
   /** const json& で undefined を返却する場合のインスタンス保有をする */
