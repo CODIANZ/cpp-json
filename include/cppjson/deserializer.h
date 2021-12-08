@@ -86,7 +86,7 @@ private:
   [[noreturn]] void throwError(const std::string& err) {
     std::stringstream ss;
     ss << "line(" << m_stream.line() << "), col(" << m_stream.col() << ") : " << err;
-    throw new bad_json(ss.str());
+    throw bad_json(ss.str());
   }
 
   static bool is_blacket(char c) {
@@ -249,6 +249,9 @@ private:
           }  
           else if(is_blacket(c)) {
             deserialize_string(key);
+            if(key.get<std::string>().empty()){
+              throwError("object key is empty");
+            }
             m = mode::find_separator;
           }
           else {
@@ -359,21 +362,20 @@ private:
       ss << c;
     }
     auto&& s = ss.str();
-    std::vector<char> verr(s.size());
-    char* err = verr.data();
-    if(bFloat){
-      auto v = ::strtod(ss.str().c_str(), &err);
-      if(verr[0] != 0){
-        throwError("cannot convert to double value");
+    try{
+      if(bFloat){
+        auto v = std::stod(ss.str().c_str());
+        j.set(v);
       }
-      j.set(v);
+      else{
+        auto v = std::stoll(ss.str().c_str());
+        j.set(v);
+      }
     }
-    else{
-      auto v = ::strtoll(ss.str().c_str(), &err, 10);
-      if(verr[0] != 0){
-        throwError("cannot convert to integral value");
-      }
-      j.set(v);
+    catch(std::exception& e){
+      std::stringstream errss;
+      errss << "cannot convert to number : \"" << s << "\" (" << e.what() << ")" << std::endl;
+      throwError(errss.str());
     }
   }
 

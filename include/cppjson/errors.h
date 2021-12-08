@@ -24,7 +24,7 @@ friend class json;
 private:
   bad_type() : error("bad_type") {}
   [[noreturn]] static void throw_error(){
-    throw new bad_type();
+    throw bad_type();
   }
 };
 
@@ -48,7 +48,7 @@ friend class json;
 private:
   value_is_undefined() : error("value_is_undefined") {}
   [[noreturn]] static void throw_error(){
-    throw new value_is_undefined();
+    throw value_is_undefined();
   }
 };
 

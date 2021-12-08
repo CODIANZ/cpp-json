@@ -30,13 +30,13 @@ void valueValidation(const json& j, const EXCEPTED_VALUE_TYPE& exceptedValue, co
       }
     }
   }
-  catch(std::exception* e){
+  catch(std::exception& e){
     if(exceptedCompareResult == compare::same){
-      std::cerr << "ng: " << e->what() << std::endl;
+      std::cerr << "ng: " << e.what() << std::endl;
       assert(false);
     }
     else{
-      std::cout << "ok: " << e->what() << std::endl;
+      std::cout << "ok: " << e.what() << std::endl;
     }
   }
 }
@@ -453,6 +453,25 @@ void test_018() {
   valueValidation<bool>(        j["key3"]["value3-2"], false, compare::same);
 }
 
+void test_019() {
+  auto fn = [](bool bWillSuccess, const char* str){
+    try{
+      std::stringstream ss(str);
+      deserializer(ss).execute();
+      assert(bWillSuccess);
+    }
+    catch(std::exception& ex){
+      std::cout << ex.what() << std::endl;
+      assert(!bWillSuccess);
+    }
+  };
+  fn(false, R"( 1234567890123456789012345678901234567890 )");
+  fn(false, R"( .123456789e12345678901234567890123456789 )");
+  fn(false, R"( {,} )");
+  fn(false, R"( [{"",1}] )");
+  fn(true , R"( [{},[],[[]]] )");
+}
+
 int main(void) {
 
   std::cout << "********** test_001() **********" << std::endl;
@@ -508,6 +527,9 @@ int main(void) {
 
   std::cout << "********** test_018() **********" << std::endl;
   test_018();
+
+  std::cout << "********** test_019() **********" << std::endl;
+  test_019();
 
   return 0;
 }
