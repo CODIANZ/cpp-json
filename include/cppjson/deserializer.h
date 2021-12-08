@@ -249,6 +249,9 @@ private:
           }  
           else if(is_blacket(c)) {
             deserialize_string(key);
+            if(key.get<std::string>().empty()){
+              throwError("object key is empty");
+            }
             m = mode::find_separator;
           }
           else {
@@ -359,20 +362,20 @@ private:
       ss << c;
     }
     auto&& s = ss.str();
-    char* err;
-    if(bFloat){
-      auto v = ::strtod(ss.str().c_str(), &err);
-      if(err[0] != 0){
-        throwError("cannot convert to double value");
+    try{
+      if(bFloat){
+        auto v = std::stod(ss.str().c_str());
+        j.set(v);
       }
-      j.set(v);
+      else{
+        auto v = std::stoll(ss.str().c_str());
+        j.set(v);
+      }
     }
-    else{
-      auto v = ::strtoll(ss.str().c_str(), &err, 10);
-      if(err[0] != 0){
-        throwError("cannot convert to integral value");
-      }
-      j.set(v);
+    catch(std::exception& e){
+      std::stringstream errss;
+      errss << "cannot convert to number : \"" << s << "\" (" << e.what() << ")" << std::endl;
+      throwError(errss.str());
     }
   }
 
