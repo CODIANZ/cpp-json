@@ -89,26 +89,52 @@ private:
    **/
   class value_container {
   private:
-    union content {
-      int64_t       _integer;
-      double        _floating_point;
-      bool          _boolean;
-      nullptr_t     _null;
-      std::string*  _string_ptr;
-      array_type*   _array_ptr;
-      object_type*  _object_ptr;
-    };
-    content         m_content;
+    static constexpr size_t content_size = std::max({
+      sizeof(int64_t),
+      sizeof(double),
+      sizeof(bool),
+      sizeof(nullptr_t),
+      sizeof(std::string),
+      sizeof(array_type),
+      sizeof(object_type)
+    });
+    uint8_t         m_content[content_size];
     value_type_id   m_value_type_id;
+
+    template<typename T> T* ptr_as() {
+      return reinterpret_cast<T*>(m_content);
+    }
+
+    template<typename T> const T* ptr_as() const {
+      return reinterpret_cast<const T*>(m_content);
+    }
 
     /** 内包する値の解放（classインスタンスは削除するが、それ以外は何もしない） */
     void destruct_value() {
       switch(value_type_id()){
-        case value_type_id::string:  { delete m_content._string_ptr; break; }
-        case value_type_id::array:   { delete m_content._array_ptr; break; }
-        case value_type_id::object:  { delete m_content._object_ptr; break; }
+        case value_type_id::string:  { ptr_as<std::string>()->~basic_string(); break; }
+        case value_type_id::array:   { ptr_as<array_type>()->~vector(); break; }
+        case value_type_id::object:  { ptr_as<object_type>()->~unordered_map(); break; }
         default: { break; } /** class インスタンスでなければ何もしない */
       }
+      m_value_type_id = value_type_id::undefined;
+    }
+
+    /** src から所有権を移転する */
+    void move_from(value_container&& src){
+      destruct_value();
+      switch(src.m_value_type_id){
+        case value_type_id::integral:       { *ptr_as<int64_t>()   = *src.ptr_as<int64_t>(); break; }
+        case value_type_id::floating_point: { *ptr_as<double>()    = *src.ptr_as<double>(); break; }
+        case value_type_id::boolean:        { *ptr_as<bool>()      = *src.ptr_as<bool>(); break; }
+        case value_type_id::null:           { *ptr_as<nullptr_t>() = *src.ptr_as<nullptr_t>(); break; }
+        case value_type_id::string: { new (m_content) std::string(std::move(*src.ptr_as<std::string>())); break; }
+        case value_type_id::array:  { new (m_content) array_type (std::move(*src.ptr_as<array_type>())); break; }
+        case value_type_id::object: { new (m_content) object_type(std::move(*src.ptr_as<object_type>())); break; }
+        default: { break; } /* undefined */
+      }
+      m_value_type_id = src.m_value_type_id;
+      src.destruct_value();
     }
 
   public:
@@ -130,35 +156,24 @@ private:
     ~value_container() { destruct_value(); }
 
     value_container& operator = (const value_container& src){
-      destruct_value();
-      auto clone = src.clone();     /** コピーを生成 */
-      m_content = clone.m_content;  /** clone からcontentの所有権移転 */
-      m_value_type_id = clone.m_value_type_id;
-      /**
-       * 複製したオブジェクト（clone）はconetntの所有権を失ったので、
-       * オブジェクトを undefined とし、この関数のスコープを抜ける際に delete されないようにする */
-      clone.m_value_type_id = value_type_traits<undefined_type>::value_type_id;
+      move_from(src.clone());
       return *this;
     }
 
     value_container& operator = (value_container&& src){
-      destruct_value();
-      m_content = src.m_content;    /** src からcontentの所有権移転 */
-      m_value_type_id = src.m_value_type_id;
-      /** srcはcontentの所有権を失ったので undefined とし delete しないようにする */
-      src.m_value_type_id = value_type_traits<undefined_type>::value_type_id;
+      move_from(std::move(src));
       return *this;
     }
 
     value_container clone() const {
       switch(value_type_id()){
-        case value_type_id::integral:       { return value_container(m_content._integer); }
-        case value_type_id::floating_point: { return value_container(m_content._floating_point); }
-        case value_type_id::boolean:        { return value_container(m_content._boolean); }
-        case value_type_id::null:           { return value_container(m_content._null); }
-        case value_type_id::string:         { return value_container(*m_content._string_ptr); }
-        case value_type_id::array:          { return value_container(*m_content._array_ptr); }
-        case value_type_id::object:         { return value_container(*m_content._object_ptr); }
+        case value_type_id::integral:       { return value_container(*ptr_as<int64_t>()); }
+        case value_type_id::floating_point: { return value_container(*ptr_as<double>()); }
+        case value_type_id::boolean:        { return value_container(*ptr_as<bool>()); }
+        case value_type_id::null:           { return value_container(*ptr_as<nullptr_t>()); }
+        case value_type_id::string:         { return value_container(*ptr_as<std::string>()); }
+        case value_type_id::array:          { return value_container(*ptr_as<array_type>()); }
+        case value_type_id::object:         { return value_container(*ptr_as<object_type>()); }
         default: /** undefined */           { return value_container(); }
       }
     }
@@ -169,17 +184,11 @@ private:
       return json::value_type_string(value_type_id());
     }
 
-    template <typename T, std::enable_if_t<value_type_traits<T>::available && !std::is_class<T>::value, bool> = true>
-    const T& get() const { return *reinterpret_cast<const T*>(&m_content); }
+    template <typename T, std::enable_if_t<value_type_traits<T>::available, bool> = true>
+    const T& get() const { return *ptr_as<T>(); }
 
-    template <typename T, std::enable_if_t<value_type_traits<T>::available && std::is_class<T>::value, bool> = true>
-    const T& get() const { return **reinterpret_cast<T* const *>(&m_content); }
-
-    template <typename T, std::enable_if_t<value_type_traits<T>::available && !std::is_class<T>::value, bool> = true>
-    T& get() { return *reinterpret_cast<T*>(&m_content); }
-
-    template <typename T, std::enable_if_t<value_type_traits<T>::available && std::is_class<T>::value, bool> = true>
-    T& get() { return **reinterpret_cast<T**>(&m_content); }
+    template <typename T, std::enable_if_t<value_type_traits<T>::available, bool> = true>
+    T& get() { return *ptr_as<T>(); }
 
     template <
       typename T,
@@ -190,7 +199,7 @@ private:
     void set(T&& value) {
       destruct_value();
       m_value_type_id = VALUE_TYPE_ID;
-      *reinterpret_cast<PURE_T*>(&m_content) = std::forward<T>(value);
+      *ptr_as<PURE_T>() = std::forward<T>(value);
     }
 
     template <
@@ -202,7 +211,7 @@ private:
     void set(T&& value) {
       destruct_value();
       m_value_type_id = VALUE_TYPE_ID;
-      *reinterpret_cast<PURE_T**>(&m_content) = new PURE_T(std::forward<T>(value));
+      new(m_content) PURE_T(std::forward<T>(value));
     }
   };
 
