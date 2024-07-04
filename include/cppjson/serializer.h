@@ -55,7 +55,7 @@ private:
         break;
       }
       case json::value_type_id::floating_point: {
-        os << j.get<double>();
+        os << std::setprecision(std::numeric_limits<double>::max_digits10) << j.get<double>();
         break;
       }
       case json::value_type_id::string: {
