@@ -30,17 +30,22 @@ public:
     static constexpr value_type_id  value_type_id = VALUE_TYPE_ID;
   };
 
-  /** value_container で保持できる型を traits で列挙 */
-  template<typename T> struct value_type_traits;
-  template<> struct value_type_traits<int64_t       > : public traits_holder<int64_t        , value_type_id::integral> {};
-  template<> struct value_type_traits<double        > : public traits_holder<double         , value_type_id::floating_point> {};
-  template<> struct value_type_traits<bool          > : public traits_holder<bool           , value_type_id::boolean> {};
-  template<> struct value_type_traits<nullptr_t     > : public traits_holder<nullptr_t      , value_type_id::null> {};
-  template<> struct value_type_traits<std::string   > : public traits_holder<std::string    , value_type_id::string> {};
-  template<> struct value_type_traits<array_type    > : public traits_holder<array_type     , value_type_id::array> {};
-  template<> struct value_type_traits<object_type   > : public traits_holder<object_type    , value_type_id::object> {};
-  template<> struct value_type_traits<undefined_type> : public traits_holder<undefined_type , value_type_id::undefined> {};
-  template<typename T> struct value_type_traits       { static constexpr bool available = false; }; /** その他 = 使用できない型 */
+  /** 使用不可の型に与える既定特性（available=false のみ）。 */
+  struct traits_unavailable { static constexpr bool available = false; };
+
+  /** value_container で保持できる型の特性（使用可・型・value_type_id）。C++17 以降、明示的特殊化は class
+   *  スコープに置けないため、std::conditional_t の連鎖で「型 → traits_holder」を選ぶ単一 primary template
+   *  として書く（挙動は従来の型別 explicit specialization と同一）。未対応型は traits_unavailable。 */
+  template<typename T> struct value_type_traits : std::conditional_t<
+      std::is_same<T, int64_t>::value,        traits_holder<int64_t,        value_type_id::integral>,       std::conditional_t<
+      std::is_same<T, double>::value,         traits_holder<double,         value_type_id::floating_point>, std::conditional_t<
+      std::is_same<T, bool>::value,           traits_holder<bool,           value_type_id::boolean>,        std::conditional_t<
+      std::is_same<T, nullptr_t>::value,      traits_holder<nullptr_t,      value_type_id::null>,           std::conditional_t<
+      std::is_same<T, std::string>::value,    traits_holder<std::string,    value_type_id::string>,         std::conditional_t<
+      std::is_same<T, array_type>::value,     traits_holder<array_type,     value_type_id::array>,          std::conditional_t<
+      std::is_same<T, object_type>::value,    traits_holder<object_type,    value_type_id::object>,         std::conditional_t<
+      std::is_same<T, undefined_type>::value, traits_holder<undefined_type, value_type_id::undefined>,
+      traits_unavailable>>>>>>>> {};
 
   /** T&& を受ける場合、const と 参照を外して value_type_traits を判定する */
   template <typename T> struct pure_value_type_traits : public value_type_traits<
